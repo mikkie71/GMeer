@@ -29,7 +29,6 @@ import {
   DEFAULT_SETTINGS,
   createDemoEvents,
   playReminderSound,
-  speakReminder,
 } from './soundAndDemo';
 
 const STORAGE_KEYS = {
@@ -279,35 +278,43 @@ export default function App() {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
   }, [settings]);
 
-  // Minute ticker to update NOW / SOON statuses
+  // Ticker (every 15 s) that updates the NOW / SOON statuses. When an appointment changes to
+  // SOON or NOW and reminders are on, the window pops up with that appointment selected
+  // (plus an optional sound). With reminders off, nothing happens apart from the status update.
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
   useEffect(() => {
     const updateStatuses = () => {
       const current = new Date();
       setNow(current);
+
+      const changes = new Map<string, EventStatus>();
+      let remindOf: CalendarEvent | null = null;
+      for (const ev of eventsRef.current) {
+        if (ev.dismissed || dismissedMap[ev.id]) continue;
+        const nextStatus = computeEventStatus(ev, settings.soonMinutes, current);
+        if (nextStatus === ev.status) continue;
+        changes.set(ev.id, nextStatus);
+        if ((nextStatus === 'SOON' || nextStatus === 'NOW') && !remindOf) remindOf = ev;
+      }
+      if (changes.size === 0) return;
+
       setEvents((prev) =>
         prev.map((ev) => {
-          const nextStatus = computeEventStatus(ev, settings.soonMinutes, current);
-          if (nextStatus !== ev.status) {
-            if (nextStatus === 'SOON' || nextStatus === 'NOW') {
-              if (settings.soundEnabled) playReminderSound();
-              if (settings.speechEnabled) {
-                speakReminder(
-                  ev.title,
-                  nextStatus === 'NOW'
-                    ? t('speechNow')
-                    : t('speechSoon', { n: settings.soonMinutes }),
-                  lang
-                );
-              }
-            }
-            if (nextStatus === 'PAST' && settings.autoDismissPast) {
-              return { ...ev, status: 'DISMISSED', dismissed: true };
-            }
-            return { ...ev, status: nextStatus };
+          const nextStatus = changes.get(ev.id);
+          if (!nextStatus) return ev;
+          if (nextStatus === 'PAST' && settings.autoDismissPast) {
+            return { ...ev, status: 'DISMISSED', dismissed: true };
           }
-          return ev;
+          return { ...ev, status: nextStatus };
         })
       );
+
+      if (remindOf && settings.remindersEnabled) {
+        if (settings.soundEnabled) playReminderSound();
+        setSelectedId(remindOf.id);
+        if (isTauri) invoke('show_reminder').catch(() => {});
+      }
     };
 
     updateStatuses();
@@ -316,9 +323,9 @@ export default function App() {
   }, [
     settings.soonMinutes,
     settings.soundEnabled,
-    settings.speechEnabled,
+    settings.remindersEnabled,
     settings.autoDismissPast,
-    lang,
+    dismissedMap,
   ]);
 
   // Fetch & parse real .ICS calendars
@@ -1303,7 +1310,22 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center justify-between py-1.5 border-b border-slate-800">
-                  <span>{t('optSound')}</span>
+                  <span>{t('optReminders')}</span>
+                  <input
+                    type="checkbox"
+                    checked={settings.remindersEnabled ?? false}
+                    onChange={(e) =>
+                      setSettings({ ...settings, remindersEnabled: e.target.checked })
+                    }
+                  />
+                </div>
+
+                <div
+                  className={`flex items-center justify-between py-1.5 pl-4 border-b border-slate-800 ${
+                    settings.remindersEnabled ? '' : 'opacity-40'
+                  }`}
+                >
+                  <span>↳ {t('optSound')}</span>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
@@ -1315,30 +1337,9 @@ export default function App() {
                     <input
                       type="checkbox"
                       checked={settings.soundEnabled}
+                      disabled={!settings.remindersEnabled}
                       onChange={(e) =>
                         setSettings({ ...settings, soundEnabled: e.target.checked })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between py-1.5 border-b border-slate-800">
-                  <span>{t('optSpeech')}</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        speakReminder('Sprint Review', t('speechSoon', { n: 15 }), lang)
-                      }
-                      className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs"
-                    >
-                      {t('testVoice')}
-                    </button>
-                    <input
-                      type="checkbox"
-                      checked={settings.speechEnabled}
-                      onChange={(e) =>
-                        setSettings({ ...settings, speechEnabled: e.target.checked })
                       }
                     />
                   </div>

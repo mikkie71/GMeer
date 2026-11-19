@@ -34,10 +34,8 @@ export interface AppSettings {
   refreshMinutes: number;
   loadDays: number;
   pastDays: number; // how many days back to include (0 = from today only)
-  popupOnSoon: boolean;
-  popupOnNow: boolean;
-  soundEnabled: boolean;
-  speechEnabled: boolean;
+  remindersEnabled?: boolean; // show the window (and optionally a sound) at 'Soon' and 'Now'
+  soundEnabled: boolean; // play a sound with a reminder (only when remindersEnabled)
   autoDismissPast: boolean;
   startWithWindows: boolean;
   language?: 'auto' | 'nl' | 'en'; // 'auto' = follow the Windows language

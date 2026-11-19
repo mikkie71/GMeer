@@ -18,7 +18,7 @@ Because milowg stopped working on it in 2017 and it started to have some bugs, I
 
 - Lives in the Windows system tray: **left-click** shows your agenda, **right-click** opens the calendar settings and options
 - Reads your Google Calendar via its secret iCal (`.ics`) address and syncs automatically
-- Reminders before an appointment starts, with optional sound and speech
+- Optional reminders: the window pops up (with an optional sound) when an appointment is about to start or starts (off by default)
 - **Double-click** an appointment to open it in Google Calendar
 - **Move to tomorrow** (same time) and **quick add** with a compact date/time picker, written directly to Google Calendar
 - Click outside the window to hide it to the tray again (can be turned off)

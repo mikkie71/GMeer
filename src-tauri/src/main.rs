@@ -99,6 +99,12 @@ pub(crate) fn open_in_browser(url: String) -> Result<(), String> {
         .map_err(|e| format!("{} {e}", tr("Kon browser niet openen:", "Could not open browser:")))
 }
 
+/// Reminder: shows the agenda window (used when an appointment becomes 'Soon' or 'Now').
+#[tauri::command]
+fn show_reminder(app: AppHandle) {
+    show_flyout(&app, "agenda");
+}
+
 /// Hides the window to the tray (same as the window's X); GMeer keeps running.
 #[tauri::command]
 fn hide_window(window: WebviewWindow) {
@@ -127,6 +133,7 @@ fn main() {
             fetch_ics,
             open_url,
             hide_window,
+            show_reminder,
             quit_app,
             google::google_status,
             google::google_connect,

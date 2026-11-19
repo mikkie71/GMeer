@@ -6,10 +6,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   refreshMinutes: 10,
   loadDays: 31,
   pastDays: 0,
-  popupOnSoon: true,
-  popupOnNow: true,
+  remindersEnabled: false,
   soundEnabled: true,
-  speechEnabled: false,
   autoDismissPast: false,
   startWithWindows: true,
   language: 'auto',
@@ -157,22 +155,5 @@ export function playReminderSound() {
     });
   } catch {
     // Ignore audio context restrictions if not interacted yet
-  }
-}
-
-/**
- * Speaks the event reminder aloud using Web Speech API (inspired by Sound.Speak in GMinder)
- */
-export function speakReminder(title: string, relativeText: string, lang: Lang = 'nl') {
-  try {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(`${title}, ${relativeText}`);
-      utterance.lang = lang === 'nl' ? 'nl-NL' : 'en-GB';
-      utterance.rate = 1.05;
-      window.speechSynthesis.speak(utterance);
-    }
-  } catch {
-    // Ignore if speech synthesis is unavailable
   }
 }
