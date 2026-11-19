@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom sleek scrollbar for the Tray Flyout */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.45);
+}
+
+/* Windows 11 System Tray Flyout Slide-Up & Slide-Down Animations */
+@keyframes traySlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(42px) scale(0.96);
+  }
+  65% {
+    opacity: 1;
+    transform: translateY(-3px) scale(1.005);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes traySlideDown {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(38px) scale(0.96);
+  }
+}
+
+.tray-flyout-enter {
+  animation: traySlideUp 0.34s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: bottom center;
+  will-change: transform, opacity;
+}
+
+.tray-flyout-exit {
+  animation: traySlideDown 0.2s cubic-bezier(0.4, 0, 1, 1) forwards;
+  transform-origin: bottom center;
+  will-change: transform, opacity;
+}

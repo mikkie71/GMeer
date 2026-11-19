@@ -1,0 +1,17 @@
+# Afhankelijkheden en build-uitvoer
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+
+# Installer staat als download bij de GitHub-release
+installer/*.exe
+
+# Oude noodoplossing en lokale tool-instellingen
+_oud/
+.claude/
+
+# Overig
+*.log
+.DS_Store
+Thumbs.db
