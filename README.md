@@ -23,7 +23,7 @@ Because milowg stopped working on it in 2017 and it started to have some bugs, I
 
 ## Installation
 
-1. Download `GMeer_1.0.0_x64-setup.exe` from the [latest release](https://github.com/mikkie71/GMeer/releases/latest) (Windows 10/11, x64).
+1. Download `GMeer_<version>_x64-setup.exe` from the [latest release](https://github.com/mikkie71/GMeer/releases/latest) (Windows 10/11, x64).
 2. Run it and choose an install folder. GMeer is installed for the current user (no admin rights needed) and starts with Windows.
 3. Windows SmartScreen may warn because the installer is not code-signed: click **More info → Run anyway**.
 
