@@ -1,6 +1,6 @@
 [package]
 name = "gmeer"
-version = "1.0.1"
+version = "1.0.2"
 description = "Moderne Windows System Tray Google Agenda Herinnering (Rust + Tauri v2)"
 authors = ["Mikkie"]
 edition = "2021"

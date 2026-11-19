@@ -10,7 +10,7 @@ Because milowg stopped working on it in 2017 and it started to have some bugs, I
   <img src="docs/settings.png" alt="GMeer calendar settings" width="380">
 </p>
 
-<sub>Screenshots show demo data. The app itself is in Dutch.</sub>
+<sub>Screenshots show demo data (Dutch interface; English is also available).</sub>
 
 ## Features
 
@@ -19,6 +19,8 @@ Because milowg stopped working on it in 2017 and it started to have some bugs, I
 - Reminders before an appointment starts, with optional sound and speech
 - **Double-click** an appointment to open it in Google Calendar
 - **Move to tomorrow** (same time) and **quick add** with a compact date/time picker, written directly to Google Calendar
+- Click outside the window to hide it to the tray again (can be turned off)
+- English and Dutch: follows the Windows language, switchable under *Opties / Options*
 - Starts with Windows (can be turned off), only one instance at a time
 
 ## Installation
