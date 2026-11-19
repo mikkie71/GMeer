@@ -5,6 +5,7 @@
 
 mod autostart;
 mod google;
+mod state;
 
 use tauri::{
     image::Image,
@@ -114,6 +115,8 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             autostart::autostart_get,
             autostart::autostart_set,
+            state::dismissed_load,
+            state::dismissed_save,
             fetch_ics,
             open_url,
             hide_window,

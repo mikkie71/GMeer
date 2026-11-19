@@ -212,6 +212,46 @@ export default function App() {
     localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(events));
   }, [events]);
 
+  // Weggeklikte afspraken (ID -> eindtijd). In de app staat dit in een eigen bestand via Rust,
+  // want localStorage gaat verloren als GMeer hard gestopt wordt (herstart, afsluiten, update).
+  const [dismissedMap, setDismissedMap] = useState<Record<string, string>>(() => {
+    const fromEvents: Record<string, string> = {};
+    for (const ev of events) if (ev.dismissed) fromEvents[ev.id] = ev.end;
+    return fromEvents;
+  });
+  const [dismissedLoaded, setDismissedLoaded] = useState(!isTauri);
+  useEffect(() => {
+    if (!isTauri) return;
+    invoke<Record<string, string>>('dismissed_load')
+      .then((stored) => setDismissedMap((cur) => ({ ...stored, ...cur })))
+      .catch((err) => console.error('dismissed_load mislukt:', err))
+      .finally(() => setDismissedLoaded(true));
+  }, []);
+  useEffect(() => {
+    if (!isTauri || !dismissedLoaded) return;
+    // Opruimen: alleen afspraken die buiten het getoonde venster vallen (pastDays + 7 dagen marge)
+    const cutoff = Date.now() - ((settings.pastDays ?? 0) + 7) * 86400000;
+    const pruned = Object.fromEntries(
+      Object.entries(dismissedMap).filter(([, end]) => {
+        const t = new Date(end).getTime();
+        return isNaN(t) || t > cutoff;
+      })
+    );
+    invoke('dismissed_save', { map: pruned }).catch((err) =>
+      console.error('dismissed_save mislukt:', err)
+    );
+  }, [dismissedMap, dismissedLoaded, settings.pastDays]);
+  // Na opstarten/sync: afspraken uit de lijst weer als weggeklikt markeren
+  useEffect(() => {
+    if (events.some((e) => dismissedMap[e.id] && !e.dismissed)) {
+      setEvents((prev) =>
+        prev.map((e) =>
+          dismissedMap[e.id] && !e.dismissed ? { ...e, dismissed: true, status: 'DISMISSED' } : e
+        )
+      );
+    }
+  }, [events, dismissedMap]);
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
   }, [settings]);
@@ -361,9 +401,9 @@ export default function App() {
   const visibleEvents = useMemo(() => {
     const enabledCalIds = new Set(calendars.filter((c) => c.enabled).map((c) => c.id));
     return events
-      .filter((e) => !e.dismissed && enabledCalIds.has(e.calendarId))
+      .filter((e) => !e.dismissed && !dismissedMap[e.id] && enabledCalIds.has(e.calendarId))
       .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
-  }, [events, calendars]);
+  }, [events, calendars, dismissedMap]);
 
   useEffect(() => {
     if (
@@ -404,6 +444,8 @@ export default function App() {
     if (e) e.stopPropagation();
     const targetId = id || selectedId;
     if (!targetId) return;
+    const target = events.find((ev) => ev.id === targetId);
+    setDismissedMap((m) => ({ ...m, [targetId]: target?.end ?? new Date().toISOString() }));
     setEvents((prev) =>
       prev.map((ev) =>
         ev.id === targetId ? { ...ev, dismissed: true, status: 'DISMISSED' } : ev
