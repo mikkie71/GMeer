@@ -11,7 +11,7 @@
   "app": {
     "windows": [
       {
-        "title": "GMeer — Google Agenda Tray",
+        "title": "GMeer — Google Calendar Tray",
         "width": 440,
         "height": 640,
         "resizable": true,

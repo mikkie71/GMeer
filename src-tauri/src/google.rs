@@ -1,10 +1,10 @@
-//! Koppeling met de Google Calendar API, zodat GMeer afspraken op de achtergrond kan
-//! verplaatsen (knop "Naar morgen").
+//! Google Calendar API connection, so GMeer can move and add appointments in the
+//! background ("To tomorrow" and quick add).
 //!
-//! - Eenmalig koppelen via OAuth 2.0 (Desktop-app, loopback + PKCE): de browser opent één keer
-//!   voor toestemming. Daarna wordt alleen het refresh-token gebruikt, zonder iets op het scherm.
-//! - HTTP-verkeer loopt via curl.exe (standaard in Windows 10/11). Gevoelige waarden (tokens,
-//!   secret) gaan via stdin naar curl en staan dus niet op de opdrachtregel.
+//! - One-time connection via OAuth 2.0 (desktop app, loopback + PKCE): the browser opens once
+//!   for consent. After that only the refresh token is used, without anything on screen.
+//! - HTTP traffic goes through curl.exe (built into Windows 10/11). Sensitive values (tokens,
+//!   secret) are passed to curl via stdin, so they never appear on the command line.
 
 use base64::Engine;
 use serde::{Deserialize, Serialize};
@@ -59,7 +59,7 @@ fn save_config(app: &AppHandle, cfg: &GoogleConfig) -> Result<(), String> {
     std::fs::write(path, json).map_err(|e| format!("{} {e}", tr("Opslaan mislukt:", "Saving failed:")))
 }
 
-/// Escapet een waarde voor een curl-configbestand (tussen dubbele aanhalingstekens).
+/// Escapes a value for a curl config file (between double quotes).
 fn curl_quote(s: &str) -> String {
     let mut out = String::with_capacity(s.len() + 2);
     out.push('"');
@@ -77,8 +77,8 @@ fn curl_quote(s: &str) -> String {
     out
 }
 
-/// Voert een HTTP-verzoek uit via curl.exe; alle opties gaan via stdin (-K -).
-/// Geeft (statuscode, body) terug.
+/// Performs an HTTP request via curl.exe; all options go through stdin (-K -).
+/// Returns (status code, body).
 fn curl_request(
     method: &str,
     url: &str,
@@ -109,7 +109,7 @@ fn curl_request(
         .stderr(Stdio::piped())
         .creation_flags(CREATE_NO_WINDOW)
         .spawn()
-        .map_err(|e| format!("curl.exe kon niet starten: {e}"))?;
+        .map_err(|e| format!("{} {e}", tr("curl.exe kon niet starten:", "Could not start curl.exe:")))?;
     child
         .stdin
         .take()
@@ -152,7 +152,7 @@ fn random_urlsafe(len: usize) -> Result<String, String> {
     Ok(base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(buf))
 }
 
-/// Wacht op de redirect van Google naar http://127.0.0.1:<poort>/?code=...
+/// Waits for Google's redirect to http://127.0.0.1:<port>/?code=...
 fn wait_for_auth_code(listener: TcpListener, expected_state: &str) -> Result<String, String> {
     listener.set_nonblocking(true).map_err(|e| e.to_string())?;
     let deadline = Instant::now() + Duration::from_secs(300);
@@ -211,7 +211,7 @@ fn wait_for_auth_code(listener: TcpListener, expected_state: &str) -> Result<Str
                 ),
             ),
             _ => {
-                // Bijv. een favicon-verzoek: negeren en blijven wachten
+                // E.g. a favicon request: ignore it and keep waiting
                 let _ = stream.write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n");
                 continue;
             }
@@ -280,7 +280,7 @@ pub fn google_status(app: AppHandle) -> GoogleStatus {
     }
 }
 
-/// Eenmalig koppelen: opent de Google-toestemmingspagina in de browser en wacht op het antwoord.
+/// One-time connection: opens Google's consent page in the browser and waits for the answer.
 #[tauri::command]
 pub async fn google_connect(
     app: AppHandle,
@@ -371,8 +371,8 @@ pub fn google_disconnect(app: AppHandle) -> Result<(), String> {
     save_config(&app, &cfg)
 }
 
-/// Verplaatst één afspraak (of één exemplaar van een reeks) in Google Agenda.
-/// `start`/`end` zijn RFC3339 (tijd) of YYYY-MM-DD (hele dag).
+/// Moves one appointment (or one instance of a series) in Google Calendar.
+/// `start`/`end` are RFC3339 (timed) or YYYY-MM-DD (all-day).
 #[tauri::command]
 pub async fn google_move_event(
     app: AppHandle,
@@ -445,8 +445,8 @@ pub async fn google_move_event(
     .map_err(|e| e.to_string())?
 }
 
-/// Maakt een nieuwe afspraak aan in Google Agenda en geeft het Google event-ID terug.
-/// `start`/`end` zijn RFC3339 met offset (bv. 2026-11-19T18:03:00+01:00).
+/// Creates a new appointment in Google Calendar and returns its Google event ID.
+/// `start`/`end` are RFC3339 with offset (e.g. 2026-11-19T18:03:00+01:00).
 #[tauri::command]
 pub async fn google_create_event(
     app: AppHandle,

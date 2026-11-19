@@ -8,8 +8,8 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
-      // Handige proxy voor tijdens browser-preview zodat je .ics URLs van Google Calendar
-      // zonder CORS-blokkade rechtstreeks in de live preview kunt testen!
+      // Proxy for the browser preview, so Google Calendar .ics URLs can be tested
+      // in the live preview without being blocked by CORS.
       '/ics-proxy': {
         target: 'https://calendar.google.com',
         changeOrigin: true,

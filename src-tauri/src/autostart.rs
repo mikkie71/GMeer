@@ -1,5 +1,5 @@
-//! "Starten met Windows": een waarde onder HKCU\...\CurrentVersion\Run (alleen voor deze gebruiker,
-//! geen beheerdersrechten nodig). De installer zet deze standaard aan; in Opties is hij aan/uit te zetten.
+//! "Start with Windows": a value under HKCU\...\CurrentVersion\Run (current user only,
+//! no admin rights needed). The installer turns it on by default; it can be toggled under Options.
 
 use std::os::windows::process::CommandExt;
 use std::process::Command;
@@ -28,10 +28,10 @@ fn exe_command() -> Result<String, String> {
     Ok(format!("\"{}\"", exe.display()))
 }
 
-/// Huidige waarde in de Run-sleutel (None = staat uit)
+/// Current value in the Run key (None = off)
 fn current_value() -> Option<String> {
     let out = reg(&["query", RUN_KEY, "/v", VALUE_NAME]).ok()?;
-    // Regel ziet eruit als: "    GMeer    REG_SZ    "C:\...\GMeer.exe""
+    // The line looks like: "    GMeer    REG_SZ    "C:\...\GMeer.exe""
     out.lines()
         .find(|l| l.trim_start().starts_with(VALUE_NAME))
         .and_then(|l| l.split_once("REG_SZ"))
@@ -49,8 +49,8 @@ pub fn set(enabled: bool) -> Result<(), String> {
     }
 }
 
-/// Bij het opstarten: als autostart aan staat maar naar een ander pad wijst
-/// (bv. na verplaatsen of herinstalleren), het pad bijwerken naar deze exe.
+/// At startup: if autostart is on but points to another path
+/// (e.g. after moving or reinstalling), update the path to this exe.
 pub fn repair_path() {
     if let (Some(current), Ok(wanted)) = (current_value(), exe_command()) {
         if !current.eq_ignore_ascii_case(&wanted) {

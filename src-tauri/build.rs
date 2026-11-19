@@ -1,6 +1,6 @@
 fn main() {
-    // MinGW (WinLibs) bin-map: via de omgevingsvariabele MINGW_BIN, anders de standaard
-    // winget-installatie (winget install BrechtSanders.WinLibs.POSIX.UCRT) van deze gebruiker.
+    // MinGW (WinLibs) bin folder: from the MINGW_BIN environment variable, otherwise the default
+    // winget installation (winget install BrechtSanders.WinLibs.POSIX.UCRT) of this user.
     println!("cargo:rerun-if-env-changed=MINGW_BIN");
     let mingw_bin = std::env::var("MINGW_BIN").unwrap_or_else(|_| {
         format!(
@@ -19,10 +19,10 @@ fn main() {
     println!("cargo:rustc-link-arg-bins=-specs={}", specs_path);
     std::env::set_var("PATH", format!("{};{}", mingw_bin, std::env::var("PATH").unwrap_or_default()));
 
-    // Laat tauri_build alle ACL/capabilities/config genereren
+    // Let tauri_build generate all ACL/capabilities/config
     tauri_build::build();
 
-    // Exact 874 bytes (geen null-byte!)
+    // Exactly 874 bytes (no null byte!)
     let manifest_xml = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0" xmlns:asmv3="urn:schemas-microsoft-com:asm.v3">
   <asmv3:application>
@@ -45,8 +45,8 @@ fn main() {
 </assembly>"#;
     std::fs::write(&manifest_xml_path, manifest_xml).unwrap();
 
-    // Manifest + programma-icoon (G+). ID 32512 is waar Tauri het standaard venstericoon zoekt;
-    // Verkenner en de taakbalk gebruiken het eerste icoon in de exe.
+    // Manifest + program icon (G+). ID 32512 is where Tauri looks for the default window icon;
+    // Explorer and the taskbar use the first icon in the exe.
     let icon_path = format!("{}/icons/icon.ico", std::env::var("CARGO_MANIFEST_DIR").unwrap())
         .replace('\\', "/");
     println!("cargo:rerun-if-changed=icons/icon.ico");

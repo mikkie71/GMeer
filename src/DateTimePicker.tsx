@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { t, locale, getLang } from './i18n';
 
 /**
- * Compacte datum + tijd kiezer: één knop (bv. "📅 do 19 nov · 14:32") die een klein
- * uitklapscherm opent met snelkeuzes, een maandkalender en een tijdveld.
+ * Compact date + time picker: a single button (e.g. "📅 Thu 19 Nov · 14:32") that opens a
+ * small popover with quick choices, a month calendar and a time field.
  */
 
 interface Props {
@@ -33,12 +33,12 @@ export default function DateTimePicker({ value, onChange }: Props) {
   );
   const rootRef = useRef<HTMLDivElement>(null);
 
-  // Bij openen: kalender op de maand van de gekozen datum zetten
+  // On open: show the month of the selected date
   useEffect(() => {
     if (open) setViewMonth(new Date(value.getFullYear(), value.getMonth(), 1));
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Klik buiten het scherm of Escape sluit het
+  // A click outside the popover or Escape closes it
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
@@ -55,10 +55,10 @@ export default function DateTimePicker({ value, onChange }: Props) {
 
   const today = new Date();
 
-  // 6 weken x 7 dagen, beginnend op maandag
+  // 6 weeks x 7 days, starting on Monday
   const days = useMemo(() => {
     const first = new Date(viewMonth);
-    const offset = (first.getDay() + 6) % 7; // maandag = 0
+    const offset = (first.getDay() + 6) % 7; // Monday = 0
     const start = new Date(first.getFullYear(), first.getMonth(), 1 - offset);
     return Array.from({ length: 42 }, (_, i) => {
       const d = new Date(start);
@@ -107,7 +107,7 @@ export default function DateTimePicker({ value, onChange }: Props) {
 
       {open && (
         <div className="absolute right-0 top-full mt-1.5 z-30 w-[236px] p-2.5 rounded-xl bg-slate-900 border border-slate-700 shadow-2xl space-y-2">
-          {/* Snelkeuzes */}
+          {/* Quick choices */}
           <div className="flex gap-1">
             {[
               { label: t('today'), n: 0 },
@@ -132,7 +132,7 @@ export default function DateTimePicker({ value, onChange }: Props) {
             })}
           </div>
 
-          {/* Maandnavigatie */}
+          {/* Month navigation */}
           <div className="flex items-center justify-between">
             <button
               type="button"
@@ -153,7 +153,7 @@ export default function DateTimePicker({ value, onChange }: Props) {
             </button>
           </div>
 
-          {/* Kalender */}
+          {/* Calendar */}
           <div className="grid grid-cols-7 gap-0.5 text-center">
             {WEEKDAYS[getLang()].map((w) => (
               <span key={w} className="text-[10px] text-slate-500 py-0.5">
@@ -185,7 +185,7 @@ export default function DateTimePicker({ value, onChange }: Props) {
             })}
           </div>
 
-          {/* Tijd */}
+          {/* Time */}
           <div className="flex items-center gap-1.5 pt-1 border-t border-slate-800">
             <span className="text-[11px] text-slate-400">{t('time')}</span>
             <button

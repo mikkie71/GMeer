@@ -1,6 +1,6 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-// Het programma heet "GMeer" (met hoofdletters)
+// The program is called "GMeer" (with capitals)
 #![allow(non_snake_case)]
 
 mod autostart;
@@ -16,15 +16,15 @@ use tauri::{
     AppHandle, Emitter, Manager, PhysicalPosition, WebviewWindow, WindowEvent,
 };
 
-/// Het GMeer-icoon (witte "G+" op blauw), ingebakken in de exe.
-/// Opnieuw genereren: `python scripts/make_icon.py`
+/// The GMeer icon (white "G+" on blue), embedded in the exe.
+/// Regenerate with: `python scripts/make_icon.py`
 fn gmeer_icon() -> Image<'static> {
     Image::from_bytes(include_bytes!("../icons/tray.png"))
-        .expect("icons/tray.png is geen geldige PNG")
+        .expect("icons/tray.png is not a valid PNG")
         .to_owned()
 }
 
-/// Positioneert het venster netjes rechtsonder boven de Windows-taakbalk (Systeemvak)
+/// Positions the window in the bottom-right corner, above the Windows taskbar (system tray)
 fn position_near_tray(window: &WebviewWindow) {
     if let Ok(Some(monitor)) = window.current_monitor() {
         let screen_size = monitor.size();
@@ -40,7 +40,7 @@ fn position_near_tray(window: &WebviewWindow) {
     }
 }
 
-/// Toont het venster rechtsonder in de gevraagde modus ("agenda" of "settings")
+/// Shows the window bottom-right in the requested mode ("agenda" or "settings")
 fn show_flyout(app: &AppHandle, mode: &str) {
     if let Some(window) = app.get_webview_window("main") {
         position_near_tray(&window);
@@ -50,8 +50,8 @@ fn show_flyout(app: &AppHandle, mode: &str) {
     }
 }
 
-/// Haalt een .ics-feed op via curl.exe (standaard aanwezig in Windows 10/11),
-/// zodat de webview geen last heeft van CORS-blokkades van Google Agenda.
+/// Fetches an .ics feed via curl.exe (built into Windows 10/11),
+/// so the webview is not affected by Google Calendar's CORS restrictions.
 #[tauri::command]
 async fn fetch_ics(url: String) -> Result<String, String> {
     let url = url.trim().to_string();
@@ -79,8 +79,8 @@ async fn fetch_ics(url: String) -> Result<String, String> {
     .map_err(|e| e.to_string())?
 }
 
-/// Opent een http(s)-link in de standaardbrowser van Windows.
-/// (window.open / target="_blank" werken niet in de Tauri-webview.)
+/// Opens an http(s) link in the Windows default browser.
+/// (window.open / target="_blank" do not work in the Tauri webview.)
 #[tauri::command]
 fn open_url(url: String) -> Result<(), String> {
     open_in_browser(url)
@@ -91,7 +91,7 @@ pub(crate) fn open_in_browser(url: String) -> Result<(), String> {
     if !url.starts_with("https://") && !url.starts_with("http://") {
         return Err(tr("Alleen http(s)-links worden ondersteund", "Only http(s) links are supported").into());
     }
-    // Via rundll32 i.p.v. "cmd /C start", zodat tekens als & in de URL heel blijven
+    // Via rundll32 instead of "cmd /C start", so characters like & in the URL stay intact
     std::process::Command::new("rundll32.exe")
         .args(["url.dll,FileProtocolHandler", &url])
         .spawn()
@@ -99,7 +99,7 @@ pub(crate) fn open_in_browser(url: String) -> Result<(), String> {
         .map_err(|e| format!("{} {e}", tr("Kon browser niet openen:", "Could not open browser:")))
 }
 
-/// Verbergt het venster naar de tray (zelfde als het kruisje); GMeer blijft draaien.
+/// Hides the window to the tray (same as the window's X); GMeer keeps running.
 #[tauri::command]
 fn hide_window(window: WebviewWindow) {
     let _ = window.hide();
@@ -112,7 +112,7 @@ fn quit_app(app: AppHandle) {
 
 fn main() {
     tauri::Builder::default()
-        // Maar één GMeer tegelijk: een tweede start toont gewoon het agendavenster van de eerste
+        // Only one GMeer at a time: a second start just shows the agenda window of the first
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_flyout(app, "agenda");
         }))
@@ -135,7 +135,7 @@ fn main() {
             google::google_create_event
         ])
         .setup(|app| {
-            // Autostart-pad bijwerken als GMeer verplaatst/opnieuw geïnstalleerd is
+            // Update the autostart path if GMeer was moved/reinstalled
             std::thread::spawn(autostart::repair_path);
 
             let tray_icon = gmeer_icon();
@@ -143,11 +143,11 @@ fn main() {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_icon(tray_icon.clone());
                 position_near_tray(&window);
-                // Klik buiten het venster: naar de tray (instelbaar onder Opties)
+                // Click outside the window: hide to the tray (configurable under Options)
                 ui::start_focus_watcher(window.clone());
             }
 
-            // Linkerklik: Agenda tonen/verbergen. Rechterklik: Instellingen (.ICS Kalenders & Opties).
+            // Left-click: show/hide the agenda. Right-click: settings (.ICS calendars & options).
             let _tray = TrayIconBuilder::with_id(ui::TRAY_ID)
                 .icon(tray_icon)
                 .tooltip(ui::tray_tooltip())
@@ -170,8 +170,8 @@ fn main() {
                                         let _ = w.hide();
                                     }
                                 } else if ui::recently_hidden_by_blur() {
-                                    // De klik op het icoon liet het venster de focus verliezen
-                                    // en dus verbergen: zo laten (deze klik was om te sluiten).
+                                    // The click on the icon made the window lose focus and
+                                    // hide itself: leave it hidden (this click meant "close").
                                 } else {
                                     show_flyout(app, "agenda");
                                 }
@@ -186,7 +186,7 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| match event {
-            // Sluiten minimaliseert naar de System Tray
+            // Closing hides the window to the system tray
             WindowEvent::CloseRequested { api, .. } => {
                 let _ = window.hide();
                 api.prevent_close();

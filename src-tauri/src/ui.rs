@@ -1,12 +1,12 @@
-//! Venstergedrag en taal aan de Rust-kant:
-//! - verbergen naar de tray zodra het venster de focus verliest (instelbaar)
-//! - taal (nl/en) voor de tray-tooltip en meldingen vanuit Rust
-//! - de Windows-weergavetaal bepalen voor de standaardtaal
+//! Window behaviour and language on the Rust side:
+//! - hide to the tray as soon as the window loses focus (configurable)
+//! - language (nl/en) for the tray tooltip, window title and messages from Rust
+//! - detect the Windows display language for the default language
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 static HIDE_ON_BLUR: AtomicBool = AtomicBool::new(true);
 static LANG_EN: AtomicBool = AtomicBool::new(false);
@@ -14,7 +14,7 @@ static LAST_BLUR_HIDE: Mutex<Option<Instant>> = Mutex::new(None);
 
 pub const TRAY_ID: &str = "GMeer-tray";
 
-/// Kies de tekst in de huidige taal.
+/// Picks the text in the current language.
 pub fn tr<'a>(nl: &'a str, en: &'a str) -> &'a str {
     if LANG_EN.load(Ordering::Relaxed) {
         en
@@ -26,23 +26,27 @@ pub fn tr<'a>(nl: &'a str, en: &'a str) -> &'a str {
 pub fn tray_tooltip() -> &'static str {
     tr(
         "GMeer — Linkerklik: Agenda | Rechterklik: Kalenders & Opties",
-        "GMeer — Left-click: Agenda | Right-click: Calendars & Options",
+        "GMeer — Left-click: Calendar | Right-click: Calendars & Options",
     )
+}
+
+pub fn window_title() -> &'static str {
+    tr("GMeer — Google Agenda Tray", "GMeer — Google Calendar Tray")
 }
 
 pub fn hide_on_blur() -> bool {
     HIDE_ON_BLUR.load(Ordering::Relaxed)
 }
 
-/// Onthoudt dat het venster net door focusverlies verborgen is.
+/// Remembers that the window was just hidden because it lost focus.
 pub fn mark_blur_hide() {
     if let Ok(mut t) = LAST_BLUR_HIDE.lock() {
         *t = Some(Instant::now());
     }
 }
 
-/// Is het venster zojuist (door een klik buiten het venster) verborgen? Dan moet een klik op
-/// het tray-icoon het niet meteen weer openen: die klik was juist bedoeld om te sluiten.
+/// Was the window just hidden (by a click outside it)? Then a click on the tray icon must not
+/// reopen it right away: that click was meant to close it.
 pub fn recently_hidden_by_blur() -> bool {
     LAST_BLUR_HIDE
         .lock()
@@ -63,14 +67,14 @@ extern "system" {
     fn GetAncestor(hwnd: isize, flags: u32) -> isize;
 }
 
-/// Bewaakt of het venster de focus verliest en verbergt het dan naar de tray.
+/// Watches whether the window loses focus and then hides it to the tray.
 ///
-/// Windows stuurt geen betrouwbaar "focus kwijt"-event naar het hoofdvenster zolang de
-/// WebView2 erin de toetsenbordfocus heeft. Daarom kijken we een paar keer per seconde welk
-/// venster vooraan staat. Pas nadat GMeer zelf vooraan heeft gestaan ("armed"), leidt een
-/// ander venster vooraan tot verbergen; zo verdwijnt het venster niet direct als Windows
-/// het bij het tonen niet de focus gaf. Pop-ups van GMeer zelf (bv. een uitklaplijst) hebben
-/// GMeer als eigenaar en tellen als "GMeer vooraan".
+/// Windows does not send a reliable "focus lost" event to the main window while the WebView2
+/// inside it holds keyboard focus. So we check a few times per second which window is in the
+/// foreground. Only after GMeer itself has been in front ("armed") does another foreground
+/// window cause hiding; that way the window does not vanish right away when Windows did not give
+/// it focus on showing. GMeer's own pop-ups (e.g. a dropdown list) are owned by GMeer and count
+/// as "GMeer in front".
 pub fn start_focus_watcher(window: tauri::WebviewWindow) {
     const GA_ROOTOWNER: u32 = 3;
     std::thread::spawn(move || {
@@ -97,7 +101,7 @@ pub fn start_focus_watcher(window: tauri::WebviewWindow) {
     });
 }
 
-/// "nl" als de Windows-weergavetaal Nederlands is, anders "en".
+/// "nl" if the Windows display language is Dutch, otherwise "en".
 #[tauri::command]
 pub fn system_language() -> &'static str {
     const LANG_DUTCH: u16 = 0x13;
@@ -114,6 +118,9 @@ pub fn ui_set_language(app: AppHandle, lang: String) {
     LANG_EN.store(lang != "nl", Ordering::Relaxed);
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
         let _ = tray.set_tooltip(Some(tray_tooltip()));
+    }
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.set_title(window_title());
     }
 }
 

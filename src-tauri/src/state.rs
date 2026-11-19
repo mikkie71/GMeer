@@ -1,8 +1,8 @@
-//! Duurzame opslag van weggeklikte (dismissed) afspraken in een eigen bestand.
+//! Durable storage of dismissed appointments in a file of their own.
 //!
-//! localStorage van de webview wordt bij veel schrijfacties vertraagd naar schijf geschreven;
-//! wordt GMeer dan hard gestopt (herstart, Windows afsluiten, update) dan gaan de laatste
-//! wijzigingen verloren. Dit bestand wordt direct en atomair (tmp + rename) geschreven.
+//! The webview's localStorage is written to disk with a delay when there are many writes;
+//! if GMeer is then killed (restart, Windows shutdown, update) the latest changes are lost.
+//! This file is written immediately and atomically (tmp + rename).
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -10,7 +10,7 @@ use tauri::{AppHandle, Manager};
 
 use crate::ui::tr;
 
-/// Afspraak-ID → eindtijd (ISO), zodat oude regels later opgeruimd kunnen worden.
+/// Appointment ID → end time (ISO), so old entries can be cleaned up later.
 type DismissedMap = HashMap<String, String>;
 
 fn dismissed_path(app: &AppHandle) -> Result<PathBuf, String> {

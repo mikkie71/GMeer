@@ -1,15 +1,15 @@
 /**
- * Vertalingen (Nederlands / English).
+ * Translations (Dutch / English).
  *
- * De taal volgt standaard Windows (Nederlands → nl, al het andere → en) en is te wijzigen
- * onder Opties. Gebruik: t('sleutel') of t('sleutel', { n: 5 }) voor {n} in de tekst.
+ * By default the language follows Windows (Dutch → nl, anything else → en); it can be changed
+ * under Options. Usage: t('key') or t('key', { n: 5 }) to fill in {n} in the text.
  */
 
 export type Lang = 'nl' | 'en';
 export type LangSetting = 'auto' | Lang;
 
 const nl = {
-  // Tijden en groepen
+  // Times and groups
   allDay: 'Hele dag',
   groupEarlier: 'Eerder — {d}',
   groupToday: 'Vandaag — {d}',
@@ -28,7 +28,7 @@ const nl = {
   speechSoon: 'begint over {n} minuten',
   syncJustNow: 'Zojuist',
 
-  // Meldingen
+  // Messages
   icsFetchFailed: 'Kon .ics niet ophalen',
   googleOpening: 'Browser geopend: geef GMeer toestemming in Google…',
   googleConnectedMsg: '✅ Gekoppeld met Google Agenda',
@@ -42,14 +42,14 @@ const nl = {
   connectFirstAdd: 'Koppel eerst Google (Opties) om in deze agenda toe te voegen',
   localOnlyLocation: 'Alleen lokaal in GMeer',
 
-  // Statuslabels
+  // Status labels
   badgeNow: 'Nu bezig',
   badgeSoon: 'Binnenkort',
   badgeSnoozed: '💤 Gesnoozed',
   badgePast: 'Geweest',
   badgePlanned: 'Gepland',
 
-  // Agendavenster
+  // Agenda window
   syncActiveTitle: 'Offline cache & sync actief',
   myAgenda: 'Mijn Agenda',
   activeCount: '{n} actief',
@@ -71,14 +71,14 @@ const nl = {
   closeTitle: 'Venster sluiten (GMeer blijft actief in het systeemvak)',
   closeBtn: '✕ Sluiten',
 
-  // Instellingen: kop en tabbladen
+  // Settings: header and tabs
   settingsTitle: '⚙️ GMeer Instellingen',
   quitTitle: 'GMeer volledig afsluiten',
   quitBtn: 'Afsluiten',
   tabCalendars: '🔗 .ICS Kalenders ({n})',
   tabOptions: '🔊 Opties & Geluid',
 
-  // Instellingen: kalenders
+  // Settings: calendars
   yourCalendars: 'Jouw Kalenders & Privé .ICS-links',
   deleteCalendar: 'Verwijder kalender',
   icsPlaceholder: "Plak hier je Google Agenda 'Geheim adres in iCal-indeling' (.ics)...",
@@ -101,7 +101,7 @@ const nl = {
   how4c: ' (eindigt op ',
   how4d: ') en plak hem hierboven!',
 
-  // Instellingen: opties
+  // Settings: options
   googleSection: 'Google Agenda koppeling',
   connected: 'Gekoppeld',
   notConnected: 'Niet gekoppeld',
@@ -127,7 +127,7 @@ const nl = {
   optLoadDays: 'Aantal dagen vooruit laden (toekomst)',
   optPastDays: 'Aantal dagen terug kijken (verleden, 0 = alleen vanaf vandaag)',
 
-  // Datum/tijd-kiezer
+  // Date/time picker
   pickDateTime: 'Datum en tijd kiezen',
   today: 'Vandaag',
   tomorrow: 'Morgen',
@@ -181,7 +181,7 @@ const en: Record<Key, string> = {
   badgePlanned: 'Planned',
 
   syncActiveTitle: 'Offline cache & sync active',
-  myAgenda: 'My Agenda',
+  myAgenda: 'My Calendar',
   activeCount: '{n} active',
   syncNowTitle: 'Sync now',
   quickAddTitle: 'Quickly add an appointment',
@@ -268,7 +268,7 @@ const en: Record<Key, string> = {
 
 const dictionaries: Record<Lang, Record<Key, string>> = { nl, en };
 
-/** Eerste schatting vóór Rust antwoordt: de taal van de webview volgt Windows. */
+/** First guess before Rust answers: the webview language follows Windows. */
 export function guessSystemLang(): Lang {
   const l = (typeof navigator !== 'undefined' && navigator.language) || '';
   return l.toLowerCase().startsWith('nl') ? 'nl' : 'en';
@@ -284,7 +284,7 @@ export function getLang(): Lang {
   return current;
 }
 
-/** Locale voor datums/tijden (en-GB: 24-uurs klok, dag vóór maand). */
+/** Locale for dates/times (en-GB: 24-hour clock, day before month). */
 export function locale(): string {
   return current === 'nl' ? 'nl-NL' : 'en-GB';
 }

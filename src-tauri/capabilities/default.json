@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Rechten voor het hoofdvenster (events ontvangen, commando's aanroepen)",
+  "description": "Permissions for the main window (receive events, call commands)",
   "windows": ["main"],
   "permissions": ["core:default"]
 }

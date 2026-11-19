@@ -16,7 +16,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   hideOnBlur: true,
 };
 
-// Namen van de demo-/standaardkalenders per taal (alleen bij de allereerste start gebruikt)
+// Names of the demo/default calendars per language (only used on the very first start)
 const CAL_NAMES: Record<Lang, Record<string, string>> = {
   nl: { 'cal-work': 'Werk & Projecten', 'cal-personal': 'Privé & Gezin', 'cal-sport': 'Verjaardagen & Sport' },
   en: { 'cal-work': 'Work & Projects', 'cal-personal': 'Personal & Family', 'cal-sport': 'Birthdays & Sports' },
@@ -70,8 +70,8 @@ export function createDemoEvents(lang: Lang): CalendarEvent[] {
       title: tx.t1,
       description: tx.d1,
       location: tx.l1,
-      start: makeTime(0, 0, -15), // 15 min geleden gestart
-      end: makeTime(0, 0, 30),    // duurt nog 30 min -> Status: NOW
+      start: makeTime(0, 0, -15), // started 15 min ago
+      end: makeTime(0, 0, 30),    // 30 more minutes -> status: NOW
       allDay: false,
       url: 'https://calendar.google.com',
       status: 'NOW',
@@ -84,7 +84,7 @@ export function createDemoEvents(lang: Lang): CalendarEvent[] {
       title: tx.t2,
       description: tx.d2,
       location: tx.l2,
-      start: makeTime(0, 0, 10),  // begint over 10 min -> Status: SOON
+      start: makeTime(0, 0, 10),  // starts in 10 min -> status: SOON
       end: makeTime(0, 0, 40),
       allDay: false,
       url: 'https://calendar.google.com',
@@ -97,7 +97,7 @@ export function createDemoEvents(lang: Lang): CalendarEvent[] {
       color: '#10b981',
       title: tx.t3,
       location: tx.l3,
-      start: makeTime(0, 3, 0),   // over 3 uur -> Status: FUTURE
+      start: makeTime(0, 3, 0),   // in 3 hours -> status: FUTURE
       end: makeTime(0, 3, 45),
       allDay: false,
       url: 'https://calendar.google.com',
@@ -110,7 +110,7 @@ export function createDemoEvents(lang: Lang): CalendarEvent[] {
       color: '#f59e0b',
       title: tx.t4,
       location: tx.l4,
-      start: makeTime(1, 2, 0),   // morgen
+      start: makeTime(1, 2, 0),   // tomorrow
       end: makeTime(1, 3, 30),
       allDay: false,
       url: 'https://calendar.google.com',

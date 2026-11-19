@@ -1,7 +1,7 @@
 [package]
 name = "gmeer"
 version = "1.0.2"
-description = "Moderne Windows System Tray Google Agenda Herinnering (Rust + Tauri v2)"
+description = "Google Calendar reminders in the Windows system tray (Rust + Tauri v2)"
 authors = ["Mikkie"]
 edition = "2021"
 license = "BSD-2-Clause"

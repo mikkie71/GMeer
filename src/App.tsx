@@ -4,13 +4,13 @@ import { invoke } from '@tauri-apps/api/core';
 import DateTimePicker from './DateTimePicker';
 import { t, setLang, locale, guessSystemLang, Lang, LangSetting } from './i18n';
 
-// Draait de pagina binnen de Tauri-app (en niet in een gewone browser-preview)?
+// Is the page running inside the Tauri app (rather than a plain browser preview)?
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 
-// Opent een link in de standaardbrowser (in Tauri via Rust, anders gewoon window.open)
+// Opens a link in the default browser (via Rust in Tauri, otherwise plain window.open)
 const openExternal = (url: string) => {
   if (isTauri) {
-    invoke('open_url', { url }).catch((err) => console.error('open_url mislukt:', err));
+    invoke('open_url', { url }).catch((err) => console.error('open_url failed:', err));
   } else {
     window.open(url, '_blank', 'noopener');
   }
@@ -97,8 +97,8 @@ function formatRelative(ev: CalendarEvent, now: Date): string {
 }
 
 export default function App() {
-  // 'agenda' = Linkermuisklik op Tray Icon (alleen de compacte agenda flyout)
-  // 'settings' = Rechtermuisklik op Tray Icon (venster met .ICS Kalenders & Opties)
+  // 'agenda' = left-click on the tray icon (compact agenda flyout only)
+  // 'settings' = right-click on the tray icon (window with .ICS calendars & options)
   const [windowMode, setWindowMode] = useState<'agenda' | 'settings'>('agenda');
   const [settingsTab, setSettingsTab] = useState<'calendars' | 'options'>('calendars');
   const [animKey, setAnimKey] = useState<number>(1);
@@ -139,7 +139,7 @@ export default function App() {
     return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
   });
 
-  // Taal: instelling, of 'auto' = Windows-taal (Nederlands → nl, anders en)
+  // Language: the setting, or 'auto' = Windows language (Dutch → nl, otherwise en)
   const [systemLang, setSystemLang] = useState<Lang>(guessSystemLang);
   useEffect(() => {
     if (!isTauri) return;
@@ -155,7 +155,7 @@ export default function App() {
     if (isTauri) invoke('ui_set_language', { lang }).catch(() => {});
   }, [lang]);
 
-  // Venster verbergen bij klikken buiten het venster (standaard aan)
+  // Hide the window when clicking outside it (on by default)
   const hideOnBlur = settings.hideOnBlur ?? true;
   useEffect(() => {
     if (isTauri) invoke('ui_set_hide_on_blur', { enabled: hideOnBlur }).catch(() => {});
@@ -164,7 +164,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [quickAddTitle, setQuickAddTitle] = useState('');
-  // Standaard: morgen, op de huidige tijd (seconden op 0)
+  // Default: tomorrow, at the current time (seconds set to 0)
   const tomorrowNow = () => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
@@ -176,7 +176,7 @@ export default function App() {
   const [quickAddState, setQuickAddState] = useState<{ busy: boolean; error?: string }>({
     busy: false,
   });
-  // 'Naar morgen'-knop: idle | bezig | gelukt | fout (melding wordt een paar seconden getoond)
+  // 'To tomorrow' button: idle | busy | done | error (the message is shown for a few seconds)
   const [moveState, setMoveState] = useState<{
     kind: 'idle' | 'busy' | 'done' | 'error';
     text?: string;
@@ -199,8 +199,8 @@ export default function App() {
   const [newCalUrl, setNewCalUrl] = useState('');
   const [newCalColor, setNewCalColor] = useState('#8b5cf6');
 
-  // Check URL query param (?mode=settings of ?mode=agenda) zodat het lichte tray-icoon
-  // met linkerklik direct Agenda opent en met rechterklik direct Instellingen opent!
+  // URL query param / hash (?mode=settings or ?mode=agenda) selects the view;
+  // used by the browser preview.
   useEffect(() => {
     const applyHashOrQuery = () => {
       const params = new URLSearchParams(window.location.search);
@@ -216,7 +216,7 @@ export default function App() {
     return () => window.removeEventListener('hashchange', applyHashOrQuery);
   }, []);
 
-  // Tauri: het tray-icoon stuurt 'tray-mode' (linkerklik = agenda, rechterklik = settings)
+  // Tauri: the tray icon sends 'tray-mode' (left-click = agenda, right-click = settings)
   useEffect(() => {
     if (!isTauri) return;
     const unlisten = listen<string>('tray-mode', (e) => {
@@ -235,8 +235,8 @@ export default function App() {
     localStorage.setItem(STORAGE_KEYS.EVENTS, JSON.stringify(events));
   }, [events]);
 
-  // Weggeklikte afspraken (ID -> eindtijd). In de app staat dit in een eigen bestand via Rust,
-  // want localStorage gaat verloren als GMeer hard gestopt wordt (herstart, afsluiten, update).
+  // Dismissed appointments (ID -> end time). In the app these live in their own file via Rust,
+  // because localStorage changes get lost when GMeer is killed (restart, shutdown, update).
   const [dismissedMap, setDismissedMap] = useState<Record<string, string>>(() => {
     const fromEvents: Record<string, string> = {};
     for (const ev of events) if (ev.dismissed) fromEvents[ev.id] = ev.end;
@@ -247,12 +247,12 @@ export default function App() {
     if (!isTauri) return;
     invoke<Record<string, string>>('dismissed_load')
       .then((stored) => setDismissedMap((cur) => ({ ...stored, ...cur })))
-      .catch((err) => console.error('dismissed_load mislukt:', err))
+      .catch((err) => console.error('dismissed_load failed:', err))
       .finally(() => setDismissedLoaded(true));
   }, []);
   useEffect(() => {
     if (!isTauri || !dismissedLoaded) return;
-    // Opruimen: alleen afspraken die buiten het getoonde venster vallen (pastDays + 7 dagen marge)
+    // Clean up: only appointments outside the displayed window (pastDays + 7 days margin)
     const cutoff = Date.now() - ((settings.pastDays ?? 0) + 7) * 86400000;
     const pruned = Object.fromEntries(
       Object.entries(dismissedMap).filter(([, end]) => {
@@ -261,10 +261,10 @@ export default function App() {
       })
     );
     invoke('dismissed_save', { map: pruned }).catch((err) =>
-      console.error('dismissed_save mislukt:', err)
+      console.error('dismissed_save failed:', err)
     );
   }, [dismissedMap, dismissedLoaded, settings.pastDays]);
-  // Na opstarten/sync: afspraken uit de lijst weer als weggeklikt markeren
+  // After startup/sync: mark appointments from the list as dismissed again
   useEffect(() => {
     if (events.some((e) => dismissedMap[e.id] && !e.dismissed)) {
       setEvents((prev) =>
@@ -341,7 +341,7 @@ export default function App() {
       try {
         let rawIcs: string;
         if (isTauri) {
-          // In de app haalt Rust de feed op (geen CORS-problemen)
+          // In the app, Rust fetches the feed (no CORS problems)
           rawIcs = await invoke<string>('fetch_ics', { url: cal.icsUrl.trim() });
         } else {
           let fetchUrl = cal.icsUrl.trim();
@@ -407,8 +407,8 @@ export default function App() {
     setIsSyncing(false);
   };
 
-  // Automatisch synchroniseren: direct bij het opstarten en daarna elke `refreshMinutes` minuten.
-  // Via een ref, zodat de timer altijd de nieuwste versie (met actuele kalenders) aanroept.
+  // Automatic sync: right at startup and then every `refreshMinutes` minutes.
+  // Via a ref, so the timer always calls the latest version (with the current calendars).
   const syncRef = useRef(syncAllCalendars);
   syncRef.current = syncAllCalendars;
   useEffect(() => {
@@ -474,7 +474,7 @@ export default function App() {
     );
   };
 
-  // Google-koppeling (voor het verplaatsen van afspraken) ophalen bij het opstarten
+  // Load the Google connection status (used for moving/adding appointments) at startup
   const refreshGoogleStatus = async () => {
     if (!isTauri) return;
     try {
@@ -491,7 +491,7 @@ export default function App() {
     refreshGoogleStatus();
   }, []);
 
-  // "Starten met Windows": de echte stand staat in het Windows-register (via Rust)
+  // "Start with Windows": the actual state lives in the Windows registry (via Rust)
   const [autostartOn, setAutostartOn] = useState<boolean | null>(null);
   useEffect(() => {
     if (!isTauri) return;
@@ -503,7 +503,7 @@ export default function App() {
     try {
       setAutostartOn(await invoke<boolean>('autostart_set', { enabled }));
     } catch (err) {
-      console.error('autostart_set mislukt:', err);
+      console.error('autostart_set failed:', err);
     }
   };
 
@@ -535,7 +535,7 @@ export default function App() {
     refreshGoogleStatus();
   };
 
-  // Datum/tijd helpers voor de Google API (lokale tijd met offset, bv. 2026-11-19T10:15:00+01:00)
+  // Date/time helpers for the Google API (local time with offset, e.g. 2026-11-19T10:15:00+01:00)
   const pad2 = (n: number) => String(n).padStart(2, '0');
   const toLocalDate = (d: Date) =>
     `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
@@ -554,8 +554,8 @@ export default function App() {
     setTimeout(() => setMoveState({ kind: 'idle' }), kind === 'done' ? 4000 : 7000);
   };
 
-  // Verplaatst de geselecteerde afspraak in Google Agenda naar MORGEN (vandaag + 1 dag),
-  // met behoud van de oorspronkelijke begintijd en duur.
+  // Moves the selected appointment in Google Calendar to TOMORROW (today + 1 day),
+  // keeping the original start time and duration.
   const handleMoveToTomorrow = async () => {
     const ev = selectedEvent;
     if (!ev || moveState.kind === 'busy') return;
@@ -564,7 +564,7 @@ export default function App() {
       return;
     }
     if (!googleStatus.connected) {
-      // De .ics-link kan alleen lezen; voor wijzigen is de Google-koppeling (OAuth) nodig.
+      // The .ics link is read-only; changes need the Google connection (OAuth).
       setGoogleMessage(t('icsReadOnly'));
       setSettingsTab('options');
       triggerFlyoutOpen('settings');
@@ -614,7 +614,7 @@ export default function App() {
         allDay: ev.allDay,
         timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       });
-      // Direct in de lijst bijwerken; de .ics-feed van Google loopt soms enkele minuten achter
+      // Update the list right away; Google's .ics feed sometimes lags a few minutes behind
       setEvents((prev) =>
         prev.map((e) =>
           e.id === ev.id
@@ -639,7 +639,7 @@ export default function App() {
     }
   };
 
-  // Google-agenda achter een kalender (uit de .ics-link), of null voor lokale/demokalenders
+  // Google calendar ID behind a calendar (from its .ics link), or null for local/demo calendars
   const googleCalendarIdOf = (c?: CalendarSource) =>
     c && c.icsUrl.trim() ? extractCalendarAddressFromIcsUrl(c.icsUrl) : null;
 
@@ -659,7 +659,7 @@ export default function App() {
     let googleEventId: string | undefined;
 
     if (googleCalId) {
-      // Echte Google-agenda: afspraak in Google aanmaken (op de achtergrond)
+      // Real Google calendar: create the appointment in Google (in the background)
       if (!isTauri || !googleStatus.connected) {
         setQuickAddState({
           busy: false,
@@ -676,7 +676,7 @@ export default function App() {
           end: toLocalRfc3339(end),
           timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         });
-        // Zelfde ID als de .ics-sync later maakt, zodat er geen dubbele regel ontstaat
+        // Same ID the .ics sync will produce later, so no duplicate row appears
         id = `${cal.id}:${googleEventId}`;
         url = `https://calendar.google.com/calendar/event?eid=${encodeURIComponent(
           btoa(`${googleEventId} ${googleCalId}`).replace(/=+$/, '')
@@ -763,7 +763,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-start">
       {/* =====================================================================
-          MODUS 1: LINKERMUISKLIK -> COMPACTE TRAY FLYOUT (ALLEEN AGENDA)
+          MODE 1: LEFT-CLICK -> COMPACT TRAY FLYOUT (AGENDA ONLY)
          ===================================================================== */}
       {isTrayVisible && windowMode === 'agenda' && (
         <div
@@ -946,7 +946,7 @@ export default function App() {
                             </div>
                           </div>
 
-                          {/* Rechts: Normaal de status badge ("Geweest" / "Nu bezig"), maar bij hover direct de rode Dismiss knop op diezelfde plek! */}
+                          {/* Right side: normally the status badge, on hover the red Dismiss button in the same spot */}
                           <div className="shrink-0 flex flex-col items-end gap-1">
                             <div className="group-hover:hidden">
                               {renderStatusBadge(ev.status)}
@@ -972,7 +972,7 @@ export default function App() {
             )}
           </div>
 
-          {/* Bottom Bar: Naar morgen & Open */}
+          {/* Bottom bar: To tomorrow & Close */}
           <div className="p-3 bg-slate-950/90 border-t border-slate-800 flex items-center justify-between gap-2">
             <button
               onClick={handleMoveToTomorrow}
@@ -1002,7 +1002,7 @@ export default function App() {
                   : t('toTomorrow'))}
             </button>
 
-            {/* Venster naar de tray (zelfde als het kruisje; GMeer blijft draaien) */}
+            {/* Hide the window to the tray (same as the window's X; GMeer keeps running) */}
             <button
               onClick={() => (isTauri ? invoke('hide_window') : undefined)}
               title={t('closeTitle')}
@@ -1015,7 +1015,7 @@ export default function App() {
       )}
 
       {/* =====================================================================
-          MODUS 2: RECHTERMUISKLIK -> INSTELLINGEN (.ICS KALENDERS & OPTIES)
+          MODE 2: RIGHT-CLICK -> SETTINGS (.ICS CALENDARS & OPTIONS)
          ===================================================================== */}
       {isTrayVisible && windowMode === 'settings' && (
         <div
@@ -1025,45 +1025,44 @@ export default function App() {
           }`}
         >
           <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-            {/* Settings Header + 2 Tabbladen */}
-            <div className="px-3 py-3 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-slate-100 whitespace-nowrap">{t('settingsTitle')}</span>
-                {isTauri && (
+            {/* Settings header: row 1 the title, row 2 Quit + the 2 tabs */}
+            <div className="px-3 py-3 bg-slate-950 border-b border-slate-800 space-y-2">
+              <div className="text-sm font-bold text-slate-100 whitespace-nowrap">{t('settingsTitle')}</div>
+              <div className="flex items-center justify-between gap-2">
+                {/* Also shown in the browser preview (does nothing there), so the layout matches */}
+                <button
+                  onClick={() => (isTauri ? invoke('quit_app') : undefined)}
+                  title={t('quitTitle')}
+                  className="px-2 py-1 rounded-lg text-[11px] font-medium whitespace-nowrap text-slate-400 border border-slate-800 hover:text-red-300 hover:border-red-800 transition"
+                >
+                  {t('quitBtn')}
+                </button>
+                <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
                   <button
-                    onClick={() => invoke('quit_app')}
-                    title={t('quitTitle')}
-                    className="ml-1 px-2 py-0.5 rounded-lg text-[11px] font-medium whitespace-nowrap text-slate-400 border border-slate-800 hover:text-red-300 hover:border-red-800 transition"
+                    onClick={() => setSettingsTab('calendars')}
+                    className={`px-2 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition ${
+                      settingsTab === 'calendars'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
                   >
-                    {t('quitBtn')}
+                    {t('tabCalendars', { n: calendars.filter((c) => c.enabled).length })}
                   </button>
-                )}
-              </div>
-              <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
-                <button
-                  onClick={() => setSettingsTab('calendars')}
-                  className={`px-2 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition ${
-                    settingsTab === 'calendars'
-                      ? 'bg-blue-600 text-white'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  {t('tabCalendars', { n: calendars.filter((c) => c.enabled).length })}
-                </button>
-                <button
-                  onClick={() => setSettingsTab('options')}
-                  className={`px-2 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition ${
-                    settingsTab === 'options'
-                      ? 'bg-blue-600 text-white'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  {t('tabOptions')}
-                </button>
+                  <button
+                    onClick={() => setSettingsTab('options')}
+                    className={`px-2 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition ${
+                      settingsTab === 'options'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    {t('tabOptions')}
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* SUBTAB 1: .ICS KALENDERS */}
+            {/* SUBTAB 1: .ICS CALENDARS */}
             {settingsTab === 'calendars' && (
               <div className="p-4 space-y-4 max-h-[430px] overflow-y-auto">
                 <div className="space-y-2.5">
@@ -1130,7 +1129,7 @@ export default function App() {
                   ))}
                 </div>
 
-                {/* Extra kalender toevoegen */}
+                {/* Add another calendar */}
                 <form
                   onSubmit={handleAddCalendar}
                   className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2.5"
@@ -1179,10 +1178,10 @@ export default function App() {
               </div>
             )}
 
-            {/* SUBTAB 2: OPTIES & GELUID */}
+            {/* SUBTAB 2: OPTIONS & SOUND */}
             {settingsTab === 'options' && (
               <div className="p-4 space-y-3 text-xs">
-                {/* Google Agenda koppeling (nodig voor 'Naar morgen') */}
+                {/* Google Calendar connection (needed for 'To tomorrow' and quick add) */}
                 <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-semibold text-slate-200">{t('googleSection')}</span>
@@ -1387,7 +1386,7 @@ export default function App() {
             )}
           </div>
 
-          {/* Uitleg-vak ALLEEN zichtbaar onder het tabblad .ICS Kalenders */}
+          {/* Help box, only shown on the .ICS Calendars tab */}
           {settingsTab === 'calendars' && (
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg space-y-2">
               <h4 className="text-xs font-bold uppercase tracking-wider text-blue-400">

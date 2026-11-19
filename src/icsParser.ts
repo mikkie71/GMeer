@@ -25,23 +25,23 @@ export interface CalendarEvent {
   status: EventStatus;
   snoozedUntil?: string; // ISO string
   dismissed?: boolean;
-  googleEventId?: string; // ID in Google Agenda (voor de API), bv. abc123 of _8d34...
-  googleCalendarId?: string; // Agenda-ID in Google, bv. naam@domein.nl
+  googleEventId?: string; // event ID in Google Calendar (for the API), e.g. abc123 or _8d34...
+  googleCalendarId?: string; // calendar ID in Google, e.g. name@example.com
 }
 
 export interface AppSettings {
   soonMinutes: number;
   refreshMinutes: number;
   loadDays: number;
-  pastDays: number; // Hoeveel dagen terug in het verleden meenemen (0 = alleen vandaag)
+  pastDays: number; // how many days back to include (0 = from today only)
   popupOnSoon: boolean;
   popupOnNow: boolean;
   soundEnabled: boolean;
   speechEnabled: boolean;
   autoDismissPast: boolean;
   startWithWindows: boolean;
-  language?: 'auto' | 'nl' | 'en'; // 'auto' = Windows-taal volgen
-  hideOnBlur?: boolean; // venster verbergen bij klikken buiten het venster
+  language?: 'auto' | 'nl' | 'en'; // 'auto' = follow the Windows language
+  hideOnBlur?: boolean; // hide the window when clicking outside it
 }
 
 /**
@@ -91,7 +91,7 @@ function unescapeIcsText(txt: string): string {
 }
 
 /**
- * Extracts the Google Calendar ID (e.g. naam@voorbeeld.nl) from the .ics URL
+ * Extracts the Google Calendar ID (e.g. name@example.com) from the .ics URL
  */
 export function extractCalendarAddressFromIcsUrl(icsUrl: string): string | null {
   const match = icsUrl.match(/\/ical\/([^/]+)\//i);
@@ -125,7 +125,7 @@ function toDateOnlyIcsString(d: Date): string {
 }
 
 /**
- * base32hex (RFC 4648, kleine letters, zonder '='), zoals Google gebruikt voor event-ID's
+ * base32hex (RFC 4648, lowercase, without '='), as Google uses for event IDs
  */
 function toBase32Hex(text: string): string {
   const alphabet = '0123456789abcdefghijklmnopqrstuv';
@@ -146,13 +146,10 @@ function toBase32Hex(text: string): string {
 }
 
 /**
- * Builds the exact Google Calendar deep-link (HtmlLink) for a specific event UID + Calendar ID.
- */
-/**
- * Zet een .ics-UID om naar het event-ID dat Google Agenda (web + API) intern gebruikt.
- * Google-ID's zijn base32hex (alleen a-v en 0-9), evt. met _<datum> voor een herhaling.
- * Afspraken van iPhone/Outlook/externe uitnodigingen (bv. 0178F91E-1535-...) krijgen bij
- * Google het ID "_" + base32hex(UID).
+ * Converts an .ics UID into the event ID Google Calendar (web + API) uses internally.
+ * Google IDs are base32hex (only a-v and 0-9), optionally with _<date> for a recurring instance.
+ * Appointments from iPhone/Outlook/external invitations (e.g. 0178F91E-1535-...) get the
+ * Google ID "_" + base32hex(UID).
  */
 export function toGoogleEventId(uid: string): string {
   let cleanEventId = uid.replace(/@google\.com$/i, '');
@@ -166,6 +163,10 @@ export function toGoogleEventId(uid: string): string {
   return cleanEventId;
 }
 
+/**
+ * Builds the exact Google Calendar deep-link (HtmlLink) for a specific event UID + Calendar ID.
+ * Falls back to the day view when no calendar address is known.
+ */
 function buildGoogleEventUrl(uid: string, icsUrl: string, start: Date): string {
   const calAddress = extractCalendarAddressFromIcsUrl(icsUrl);
   const cleanEventId = uid ? toGoogleEventId(uid) : '';
@@ -320,7 +321,7 @@ export function parseIcsFeed(
   const calendarAddress = extractCalendarAddressFromIcsUrl(calendar.icsUrl) ?? undefined;
 
   const now = new Date();
-  // Standaard pastDays = 0 -> vanaf vandaag 00:00 (net als GMinder DateTime.Today!)
+  // Default pastDays = 0 -> from today 00:00 (like GMinder's DateTime.Today)
   const minDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - pastDays, 0, 0, 0);
   const maxDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + loadDays, 23, 59, 59);
 
@@ -460,7 +461,7 @@ export function parseIcsFeed(
     const baseUid = rev.uid.replace(/@google\.com$/i, '');
 
     if (rev.rrule && !rev.recurrenceIdSuffix) {
-      // Herhalende reeks: vouw uit naar losse afspraken én plak _YYYYMMDDTHHMMSSZ achter het UID!
+      // Recurring series: expand into single occurrences and append _YYYYMMDDTHHMMSSZ to the UID
       const occurrences = expandRecurringInstances(
         start,
         durationMs,
@@ -493,7 +494,7 @@ export function parseIcsFeed(
         });
       }
     } else {
-      // Enkele afspraak of verplaatste instantie uit een reeks (met RECURRENCE-ID)
+      // Single appointment, or a moved instance of a series (with RECURRENCE-ID)
       if (end >= minDate && start <= maxDate) {
         const effectiveUid =
           rev.recurrenceIdSuffix && !baseUid.includes('_')
