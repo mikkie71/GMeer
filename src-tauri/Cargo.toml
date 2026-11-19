@@ -4,6 +4,8 @@ version = "1.0.0"
 description = "Moderne Windows System Tray Google Agenda Herinnering (Rust + Tauri v2)"
 authors = ["Mikkie"]
 edition = "2021"
+license = "BSD-2-Clause"
+repository = "https://github.com/mikkie71/GMeer"
 
 [[bin]]
 name = "GMeer"
