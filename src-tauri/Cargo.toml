@@ -1,6 +1,6 @@
 [package]
 name = "gmeer"
-version = "1.0.2"
+version = "1.0.3"
 description = "Google Calendar reminders in the Windows system tray (Rust + Tauri v2)"
 authors = ["Mikkie"]
 edition = "2021"
