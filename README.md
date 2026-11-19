@@ -4,6 +4,8 @@ Fork of [milowg/GMinder](https://github.com/milowg/GMinder).
 
 Because milowg stopped working on it in 2017 and it started to have some bugs, I rewrote it in Rust with Tauri (instead of the previous .NET 4.x) and also updated all necessary dependencies (Rust crates & npm). Further, I made it a bit more modern, with icons instead of buttons.
 
+🌐 **Available in 2 languages: English and Dutch (Nederlands).**
+
 <p align="center">
   <img src="docs/agenda.png" alt="GMeer agenda window" width="380">
   &nbsp;&nbsp;
@@ -22,6 +24,16 @@ Because milowg stopped working on it in 2017 and it started to have some bugs, I
 - Click outside the window to hide it to the tray again (can be turned off)
 - English and Dutch: follows the Windows language, switchable under *Opties / Options*
 - Starts with Windows (can be turned off), only one instance at a time
+
+## Languages
+
+GMeer is available in **English** and **Dutch (Nederlands)**:
+
+- **Automatic** (default): Dutch when Windows is set to Dutch, English for any other Windows language.
+- **Change it** any time under *Options → Language* (*Opties → Taal*); the app switches right away, no restart needed.
+- The installer also picks English or Dutch automatically, based on the Windows language.
+
+All texts live in [`src/i18n.ts`](src/i18n.ts). Adding another language means adding one more column there.
 
 ## Installation
 
