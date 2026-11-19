@@ -4,6 +4,8 @@
 use std::os::windows::process::CommandExt;
 use std::process::Command;
 
+use crate::ui::tr;
+
 const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
 const VALUE_NAME: &str = "GMeer";
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -13,7 +15,7 @@ fn reg(args: &[&str]) -> Result<String, String> {
         .args(args)
         .creation_flags(CREATE_NO_WINDOW)
         .output()
-        .map_err(|e| format!("reg.exe kon niet starten: {e}"))?;
+        .map_err(|e| format!("{} {e}", tr("reg.exe kon niet starten:", "Could not start reg.exe:")))?;
     if out.status.success() {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     } else {

@@ -6,6 +6,9 @@
 mod autostart;
 mod google;
 mod state;
+mod ui;
+
+use ui::tr;
 
 use tauri::{
     image::Image,
@@ -53,7 +56,7 @@ fn show_flyout(app: &AppHandle, mode: &str) {
 async fn fetch_ics(url: String) -> Result<String, String> {
     let url = url.trim().to_string();
     if !url.starts_with("https://") && !url.starts_with("http://") {
-        return Err("Alleen http(s)-links worden ondersteund".into());
+        return Err(tr("Alleen http(s)-links worden ondersteund", "Only http(s) links are supported").into());
     }
     tauri::async_runtime::spawn_blocking(move || {
         use std::os::windows::process::CommandExt;
@@ -62,10 +65,11 @@ async fn fetch_ics(url: String) -> Result<String, String> {
             .args(["-s", "-S", "-L", "-f", "--max-time", "30", "--", &url])
             .creation_flags(CREATE_NO_WINDOW)
             .output()
-            .map_err(|e| format!("curl.exe kon niet starten: {e}"))?;
+            .map_err(|e| format!("{} {e}", tr("curl.exe kon niet starten:", "Could not start curl.exe:")))?;
         if !output.status.success() {
             return Err(format!(
-                "Ophalen mislukt: {}",
+                "{} {}",
+                tr("Ophalen mislukt:", "Download failed:"),
                 String::from_utf8_lossy(&output.stderr).trim()
             ));
         }
@@ -85,14 +89,14 @@ fn open_url(url: String) -> Result<(), String> {
 pub(crate) fn open_in_browser(url: String) -> Result<(), String> {
     let url = url.trim().to_string();
     if !url.starts_with("https://") && !url.starts_with("http://") {
-        return Err("Alleen http(s)-links worden ondersteund".into());
+        return Err(tr("Alleen http(s)-links worden ondersteund", "Only http(s) links are supported").into());
     }
     // Via rundll32 i.p.v. "cmd /C start", zodat tekens als & in de URL heel blijven
     std::process::Command::new("rundll32.exe")
         .args(["url.dll,FileProtocolHandler", &url])
         .spawn()
         .map(|_| ())
-        .map_err(|e| format!("Kon browser niet openen: {e}"))
+        .map_err(|e| format!("{} {e}", tr("Kon browser niet openen:", "Could not open browser:")))
 }
 
 /// Verbergt het venster naar de tray (zelfde als het kruisje); GMeer blijft draaien.
@@ -117,6 +121,9 @@ fn main() {
             autostart::autostart_set,
             state::dismissed_load,
             state::dismissed_save,
+            ui::system_language,
+            ui::ui_set_language,
+            ui::ui_set_hide_on_blur,
             fetch_ics,
             open_url,
             hide_window,
@@ -136,12 +143,14 @@ fn main() {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_icon(tray_icon.clone());
                 position_near_tray(&window);
+                // Klik buiten het venster: naar de tray (instelbaar onder Opties)
+                ui::start_focus_watcher(window.clone());
             }
 
             // Linkerklik: Agenda tonen/verbergen. Rechterklik: Instellingen (.ICS Kalenders & Opties).
-            let _tray = TrayIconBuilder::with_id("GMeer-tray")
+            let _tray = TrayIconBuilder::with_id(ui::TRAY_ID)
                 .icon(tray_icon)
-                .tooltip("GMeer — Linkerklik: Agenda | Rechterklik: Kalenders & Opties")
+                .tooltip(ui::tray_tooltip())
                 .on_tray_icon_event(|tray, event| {
                     if let TrayIconEvent::Click {
                         button,
@@ -160,6 +169,9 @@ fn main() {
                                     if let Some(w) = app.get_webview_window("main") {
                                         let _ = w.hide();
                                     }
+                                } else if ui::recently_hidden_by_blur() {
+                                    // De klik op het icoon liet het venster de focus verliezen
+                                    // en dus verbergen: zo laten (deze klik was om te sluiten).
                                 } else {
                                     show_flyout(app, "agenda");
                                 }
@@ -173,12 +185,13 @@ fn main() {
 
             Ok(())
         })
-        .on_window_event(|window, event| {
+        .on_window_event(|window, event| match event {
             // Sluiten minimaliseert naar de System Tray
-            if let WindowEvent::CloseRequested { api, .. } = event {
+            WindowEvent::CloseRequested { api, .. } => {
                 let _ = window.hide();
                 api.prevent_close();
             }
+            _ => {}
         })
         .run(tauri::generate_context!())
         .expect("error while running GMeer tauri application");

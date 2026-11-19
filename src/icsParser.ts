@@ -40,6 +40,8 @@ export interface AppSettings {
   speechEnabled: boolean;
   autoDismissPast: boolean;
   startWithWindows: boolean;
+  language?: 'auto' | 'nl' | 'en'; // 'auto' = Windows-taal volgen
+  hideOnBlur?: boolean; // venster verbergen bij klikken buiten het venster
 }
 
 /**

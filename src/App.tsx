@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/core';
 import DateTimePicker from './DateTimePicker';
+import { t, setLang, locale, guessSystemLang, Lang, LangSetting } from './i18n';
 
 // Draait de pagina binnen de Tauri-app (en niet in een gewone browser-preview)?
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -24,7 +25,7 @@ import {
   EventStatus,
 } from './icsParser';
 import {
-  DEFAULT_CALENDARS,
+  defaultCalendars,
   DEFAULT_SETTINGS,
   createDemoEvents,
   playReminderSound,
@@ -38,11 +39,11 @@ const STORAGE_KEYS = {
 };
 
 function formatTimeRange(startIso: string, endIso: string, allDay: boolean): string {
-  if (allDay) return 'Hele dag';
+  if (allDay) return t('allDay');
   const s = new Date(startIso);
   const e = new Date(endIso);
   const fmt = (d: Date) =>
-    d.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+    d.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' });
   return `${fmt(s)} - ${fmt(e)}`;
 }
 
@@ -53,16 +54,16 @@ function formatDayGroup(startIso: string): string {
   const target = new Date(d.getFullYear(), d.getMonth(), d.getDate());
   const diffDays = Math.round((target.getTime() - today.getTime()) / 86400000);
 
-  const dateLabel = d.toLocaleDateString('nl-NL', {
+  const dateLabel = d.toLocaleDateString(locale(), {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
   });
 
-  if (diffDays < 0) return `Eerder — ${dateLabel}`;
-  if (diffDays === 0) return `Vandaag — ${dateLabel}`;
-  if (diffDays === 1) return `Morgen — ${dateLabel}`;
-  if (diffDays < 7) return `Over ${diffDays} dagen — ${dateLabel}`;
+  if (diffDays < 0) return t('groupEarlier', { d: dateLabel });
+  if (diffDays === 0) return t('groupToday', { d: dateLabel });
+  if (diffDays === 1) return t('groupTomorrow', { d: dateLabel });
+  if (diffDays < 7) return t('groupInDays', { n: diffDays, d: dateLabel });
   return dateLabel;
 }
 
@@ -72,7 +73,7 @@ function formatRelative(ev: CalendarEvent, now: Date): string {
       1,
       Math.round((new Date(ev.snoozedUntil).getTime() - now.getTime()) / 60000)
     );
-    return `Gesnoozed (${mins}m)`;
+    return t('relSnoozed', { n: mins });
   }
 
   const start = new Date(ev.start);
@@ -80,19 +81,19 @@ function formatRelative(ev: CalendarEvent, now: Date): string {
 
   if (now >= start && now < end) {
     const leftMins = Math.max(1, Math.round((end.getTime() - now.getTime()) / 60000));
-    if (leftMins < 60) return `Nog ${leftMins} min`;
+    if (leftMins < 60) return t('relLeftMin', { n: leftMins });
     const hrs = Math.floor(leftMins / 60);
-    return `Nog ${hrs}u ${leftMins % 60}m`;
+    return t('relLeftHM', { h: hrs, m: leftMins % 60 });
   }
 
   const diffMins = Math.round((start.getTime() - now.getTime()) / 60000);
-  if (diffMins < 0) return 'Afgelopen';
-  if (diffMins === 0) return 'Begint nu!';
-  if (diffMins < 60) return `Over ${diffMins} min`;
+  if (diffMins < 0) return t('relEnded');
+  if (diffMins === 0) return t('relStartsNow');
+  if (diffMins < 60) return t('relInMin', { n: diffMins });
   const diffHrs = Math.floor(diffMins / 60);
-  if (diffHrs < 24) return `Over ${diffHrs} uur`;
+  if (diffHrs < 24) return t('relInHours', { n: diffHrs });
   const diffDays = Math.round(diffHrs / 24);
-  return diffDays === 1 ? 'Morgen' : `Over ${diffDays} dagen`;
+  return diffDays === 1 ? t('relTomorrow') : t('relInDays', { n: diffDays });
 }
 
 export default function App() {
@@ -125,18 +126,40 @@ export default function App() {
 
   const [calendars, setCalendars] = useState<CalendarSource[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.CALENDARS);
-    return saved ? JSON.parse(saved) : DEFAULT_CALENDARS;
+    return saved ? JSON.parse(saved) : defaultCalendars(guessSystemLang());
   });
 
   const [events, setEvents] = useState<CalendarEvent[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.EVENTS);
-    return saved ? JSON.parse(saved) : createDemoEvents();
+    return saved ? JSON.parse(saved) : createDemoEvents(guessSystemLang());
   });
 
   const [settings, setSettings] = useState<AppSettings>(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.SETTINGS);
     return saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
   });
+
+  // Taal: instelling, of 'auto' = Windows-taal (Nederlands → nl, anders en)
+  const [systemLang, setSystemLang] = useState<Lang>(guessSystemLang);
+  useEffect(() => {
+    if (!isTauri) return;
+    invoke<Lang>('system_language')
+      .then((l) => setSystemLang(l === 'nl' ? 'nl' : 'en'))
+      .catch(() => {});
+  }, []);
+  const langSetting: LangSetting = settings.language ?? 'auto';
+  const lang: Lang = langSetting === 'auto' ? systemLang : langSetting;
+  setLang(lang);
+  useEffect(() => {
+    document.documentElement.lang = lang;
+    if (isTauri) invoke('ui_set_language', { lang }).catch(() => {});
+  }, [lang]);
+
+  // Venster verbergen bij klikken buiten het venster (standaard aan)
+  const hideOnBlur = settings.hideOnBlur ?? true;
+  useEffect(() => {
+    if (isTauri) invoke('ui_set_hide_on_blur', { enabled: hideOnBlur }).catch(() => {});
+  }, [hideOnBlur]);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
@@ -168,7 +191,7 @@ export default function App() {
   const [googleBusy, setGoogleBusy] = useState(false);
   const [googleMessage, setGoogleMessage] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
-  const [lastSyncText, setLastSyncText] = useState('Zojuist');
+  const [lastSyncAt, setLastSyncAt] = useState<Date | null>(null);
   const [now, setNow] = useState(new Date());
 
   // New calendar form state
@@ -271,8 +294,9 @@ export default function App() {
                 speakReminder(
                   ev.title,
                   nextStatus === 'NOW'
-                    ? 'begint nu!'
-                    : `begint over ${settings.soonMinutes} minuten`
+                    ? t('speechNow')
+                    : t('speechSoon', { n: settings.soonMinutes }),
+                  lang
                 );
               }
             }
@@ -294,6 +318,7 @@ export default function App() {
     settings.soundEnabled,
     settings.speechEnabled,
     settings.autoDismissPast,
+    lang,
   ]);
 
   // Fetch & parse real .ICS calendars
@@ -304,9 +329,7 @@ export default function App() {
     if (activeWithUrl.length === 0) {
       setTimeout(() => {
         setIsSyncing(false);
-        setLastSyncText(
-          new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
-        );
+        setLastSyncAt(new Date());
       }, 450);
       return;
     }
@@ -336,7 +359,7 @@ export default function App() {
         if (idx !== -1) {
           updatedCalendars[idx] = {
             ...updatedCalendars[idx],
-            lastSync: new Date().toLocaleTimeString('nl-NL', {
+            lastSync: new Date().toLocaleTimeString(locale(), {
               hour: '2-digit',
               minute: '2-digit',
             }),
@@ -348,7 +371,7 @@ export default function App() {
         if (idx !== -1) {
           updatedCalendars[idx] = {
             ...updatedCalendars[idx],
-            error: err instanceof Error ? err.message : 'Kon .ics niet ophalen',
+            error: err instanceof Error ? err.message : String(err || t('icsFetchFailed')),
           };
         }
       }
@@ -380,9 +403,7 @@ export default function App() {
       });
     }
 
-    setLastSyncText(
-      new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })
-    );
+    setLastSyncAt(new Date());
     setIsSyncing(false);
   };
 
@@ -438,7 +459,7 @@ export default function App() {
       }
     }
     return groups;
-  }, [visibleEvents]);
+  }, [visibleEvents, lang]);
 
   const handleDismiss = (id?: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -488,14 +509,14 @@ export default function App() {
 
   const handleGoogleConnect = async () => {
     setGoogleBusy(true);
-    setGoogleMessage('Browser geopend: geef GMeer toestemming in Google…');
+    setGoogleMessage(t('googleOpening'));
     try {
       await invoke('google_connect', {
         clientId: googleClientId,
         clientSecret: googleClientSecret,
       });
       setGoogleClientSecret('');
-      setGoogleMessage('✅ Gekoppeld met Google Agenda');
+      setGoogleMessage(t('googleConnectedMsg'));
     } catch (err) {
       setGoogleMessage(`⚠️ ${err}`);
     } finally {
@@ -507,7 +528,7 @@ export default function App() {
   const handleGoogleDisconnect = async () => {
     try {
       await invoke('google_disconnect');
-      setGoogleMessage('Ontkoppeld');
+      setGoogleMessage(t('googleDisconnectedMsg'));
     } catch (err) {
       setGoogleMessage(`⚠️ ${err}`);
     }
@@ -539,20 +560,18 @@ export default function App() {
     const ev = selectedEvent;
     if (!ev || moveState.kind === 'busy') return;
     if (!isTauri) {
-      showMoveResult('error', 'Alleen beschikbaar in de app');
+      showMoveResult('error', t('onlyInApp'));
       return;
     }
     if (!googleStatus.connected) {
       // De .ics-link kan alleen lezen; voor wijzigen is de Google-koppeling (OAuth) nodig.
-      setGoogleMessage(
-        'De .ics-link kan alleen lezen. Om afspraken te verplaatsen moet GMeer eenmalig toestemming krijgen van Google.'
-      );
+      setGoogleMessage(t('icsReadOnly'));
       setSettingsTab('options');
       triggerFlyoutOpen('settings');
       return;
     }
     if (!ev.googleEventId || !ev.googleCalendarId) {
-      showMoveResult('error', 'Geen Google-afspraak');
+      showMoveResult('error', t('notGoogleEvent'));
       return;
     }
 
@@ -612,8 +631,8 @@ export default function App() {
       showMoveResult(
         'done',
         ev.allDay
-          ? 'Verplaatst naar morgen (hele dag)'
-          : `Verplaatst naar morgen ${pad2(newStart.getHours())}:${pad2(newStart.getMinutes())}`
+          ? t('movedAllDay')
+          : t('movedAt', { t: `${pad2(newStart.getHours())}:${pad2(newStart.getMinutes())}` })
       );
     } catch (err) {
       showMoveResult('error', String(err));
@@ -644,7 +663,7 @@ export default function App() {
       if (!isTauri || !googleStatus.connected) {
         setQuickAddState({
           busy: false,
-          error: 'Koppel eerst Google (Opties) om in deze agenda toe te voegen',
+          error: t('connectFirstAdd'),
         });
         return;
       }
@@ -674,7 +693,7 @@ export default function App() {
       calendarName: cal.name,
       color: cal.color,
       title,
-      location: googleCalId ? undefined : 'Alleen lokaal in GMeer',
+      location: googleCalId ? undefined : t('localOnlyLocation'),
       start: start.toISOString(),
       end: end.toISOString(),
       allDay: false,
@@ -715,29 +734,29 @@ export default function App() {
       case 'NOW':
         return (
           <span className="text-xs px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-400 border border-rose-500/30 font-semibold animate-pulse">
-            Nu bezig
+            {t('badgeNow')}
           </span>
         );
       case 'SOON':
         return (
           <span className="text-xs px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 font-semibold">
-            Binnenkort
+            {t('badgeSoon')}
           </span>
         );
       case 'SNOOZED':
         return (
           <span className="text-xs px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 font-medium">
-            💤 Gesnoozed
+            {t('badgeSnoozed')}
           </span>
         );
       case 'PAST':
         return (
           <span className="text-xs px-2 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700">
-            Geweest
+            {t('badgePast')}
           </span>
         );
       default:
-        return <span className="text-xs text-slate-400">Gepland</span>;
+        return <span className="text-xs text-slate-400">{t('badgePlanned')}</span>;
     }
   };
 
@@ -758,24 +777,27 @@ export default function App() {
             <div className="flex items-center gap-2.5">
               <span
                 className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"
-                title="Offline Cache & Sync Actief"
+                title={t('syncActiveTitle')}
               />
               <div>
                 <div className="text-sm font-semibold flex items-center gap-2">
-                  <span>Mijn Agenda</span>
+                  <span>{t('myAgenda')}</span>
                   {activeAlertsCount > 0 && (
                     <span className="text-xs px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/30 font-medium">
-                      {activeAlertsCount} actief
+                      {t('activeCount', { n: activeAlertsCount })}
                     </span>
                   )}
                 </div>
                 <div className="text-xs text-slate-400">
-                  {now.toLocaleDateString('nl-NL', {
+                  {now.toLocaleDateString(locale(), {
                     weekday: 'long',
                     day: 'numeric',
                     month: 'long',
                   })}{' '}
-                  • Sync: {lastSyncText}
+                  • Sync:{' '}
+                  {lastSyncAt
+                    ? lastSyncAt.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })
+                    : t('syncJustNow')}
                 </div>
               </div>
             </div>
@@ -783,7 +805,7 @@ export default function App() {
             <div className="flex items-center gap-1">
               <button
                 onClick={syncAllCalendars}
-                title="Nu synchroniseren"
+                title={t('syncNowTitle')}
                 className={`p-1.5 rounded-lg hover:bg-slate-800 text-slate-300 transition ${
                   isSyncing ? 'animate-spin text-blue-400' : ''
                 }`}
@@ -801,10 +823,10 @@ export default function App() {
                   }
                   setQuickAddOpen((v) => !v);
                 }}
-                title="Snel afspraak toevoegen"
+                title={t('quickAddTitle')}
                 className="px-2.5 py-1 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-500/30 text-xs font-semibold transition"
               >
-                ＋ Nieuw
+                {t('newBtn')}
               </button>
             </div>
           </div>
@@ -817,7 +839,7 @@ export default function App() {
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-blue-400">
-                  ⚡ Snel Afspraak Toevoegen
+                  {t('quickAddHeader')}
                 </span>
                 <button
                   type="button"
@@ -832,7 +854,7 @@ export default function App() {
                   type="text"
                   value={quickAddTitle}
                   onChange={(e) => setQuickAddTitle(e.target.value)}
-                  placeholder="Bijv. Tandarts controle..."
+                  placeholder={t('quickAddPlaceholder')}
                   className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-blue-500"
                   autoFocus
                 />
@@ -856,10 +878,10 @@ export default function App() {
                   className="px-3 py-1 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white rounded-lg text-xs font-medium transition"
                 >
                   {quickAddState.busy
-                    ? '⏳ Toevoegen…'
+                    ? t('adding')
                     : googleCalendarIdOf(calendars.find((c) => c.id === quickAddCalId))
-                      ? 'Toevoegen aan Google'
-                      : 'Toevoegen (lokaal)'}
+                      ? t('addToGoogle')
+                      : t('addLocal')}
                 </button>
               </div>
               {quickAddState.error && (
@@ -874,10 +896,10 @@ export default function App() {
               <div className="p-8 text-center space-y-3">
                 <div className="text-2xl">🎉</div>
                 <div className="text-sm font-medium text-slate-300">
-                  Geen openstaande afspraken!
+                  {t('noEvents')}
                 </div>
                 <p className="text-xs text-slate-400">
-                  Klik met de rechtermuisknop op het tray-icoon om je .ICS-kalenders te beheren.
+                  {t('noEventsHint')}
                 </p>
               </div>
             ) : (
@@ -933,9 +955,9 @@ export default function App() {
                               type="button"
                               onClick={(e) => handleDismiss(ev.id, e)}
                               className="hidden group-hover:inline-flex items-center gap-1 text-xs px-2.5 py-0.5 rounded-md bg-rose-600 hover:bg-rose-500 text-white font-semibold shadow-sm transition"
-                              title="Afspraak direct afvinken (Dismiss)"
+                              title={t('dismissTitle')}
                             >
-                              ✓ Dismiss
+                              {t('dismissBtn')}
                             </button>
                             <span className="text-xs text-slate-400">
                               {formatRelative(ev, now)}
@@ -958,7 +980,7 @@ export default function App() {
               title={
                 moveState.kind === 'error'
                   ? moveState.text
-                  : 'Verplaats deze afspraak in Google Agenda naar morgen, zelfde tijd'
+                  : t('moveTitle')
               }
               className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition disabled:opacity-60 max-w-[60%] truncate ${
                 moveState.kind === 'done'
@@ -968,25 +990,25 @@ export default function App() {
                     : 'bg-slate-900 hover:bg-blue-500/20 border-slate-700'
               }`}
             >
-              {moveState.kind === 'busy' && '⏳ Verplaatsen…'}
+              {moveState.kind === 'busy' && t('moving')}
               {moveState.kind === 'done' && `✅ ${moveState.text}`}
               {moveState.kind === 'error' && `⚠️ ${moveState.text}`}
               {moveState.kind === 'idle' &&
                 (selectedEvent && !selectedEvent.allDay
-                  ? `➡️ Naar morgen ${new Date(selectedEvent.start).toLocaleTimeString('nl-NL', {
+                  ? `${t('toTomorrow')} ${new Date(selectedEvent.start).toLocaleTimeString(locale(), {
                       hour: '2-digit',
                       minute: '2-digit',
                     })}`
-                  : '➡️ Naar morgen')}
+                  : t('toTomorrow'))}
             </button>
 
             {/* Venster naar de tray (zelfde als het kruisje; GMeer blijft draaien) */}
             <button
               onClick={() => (isTauri ? invoke('hide_window') : undefined)}
-              title="Venster sluiten (GMeer blijft actief in het systeemvak)"
+              title={t('closeTitle')}
               className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 border border-red-500 text-white text-xs font-semibold transition shadow-sm shadow-red-900/40"
             >
-              ✕ Sluiten
+              {t('closeBtn')}
             </button>
           </div>
         </div>
@@ -1004,39 +1026,39 @@ export default function App() {
         >
           <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col">
             {/* Settings Header + 2 Tabbladen */}
-            <div className="px-4 py-3 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+            <div className="px-3 py-3 bg-slate-950 border-b border-slate-800 flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-slate-100">⚙️ GMeer Instellingen</span>
+                <span className="text-sm font-bold text-slate-100 whitespace-nowrap">{t('settingsTitle')}</span>
                 {isTauri && (
                   <button
                     onClick={() => invoke('quit_app')}
-                    title="GMeer volledig afsluiten"
-                    className="ml-1 px-2 py-0.5 rounded-lg text-[11px] font-medium text-slate-400 border border-slate-800 hover:text-red-300 hover:border-red-800 transition"
+                    title={t('quitTitle')}
+                    className="ml-1 px-2 py-0.5 rounded-lg text-[11px] font-medium whitespace-nowrap text-slate-400 border border-slate-800 hover:text-red-300 hover:border-red-800 transition"
                   >
-                    Afsluiten
+                    {t('quitBtn')}
                   </button>
                 )}
               </div>
               <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
                 <button
                   onClick={() => setSettingsTab('calendars')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
+                  className={`px-2 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition ${
                     settingsTab === 'calendars'
                       ? 'bg-blue-600 text-white'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  🔗 .ICS Kalenders ({calendars.filter((c) => c.enabled).length})
+                  {t('tabCalendars', { n: calendars.filter((c) => c.enabled).length })}
                 </button>
                 <button
                   onClick={() => setSettingsTab('options')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition ${
+                  className={`px-2 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition ${
                     settingsTab === 'options'
                       ? 'bg-blue-600 text-white'
                       : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
-                  🔊 Opties & Geluid
+                  {t('tabOptions')}
                 </button>
               </div>
             </div>
@@ -1046,7 +1068,7 @@ export default function App() {
               <div className="p-4 space-y-4 max-h-[430px] overflow-y-auto">
                 <div className="space-y-2.5">
                   <div className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    Jouw Kalenders & Privé .ICS-links
+                    {t('yourCalendars')}
                   </div>
                   {calendars.map((cal) => (
                     <div
@@ -1078,7 +1100,7 @@ export default function App() {
                             setCalendars((prev) => prev.filter((c) => c.id !== cal.id))
                           }
                           className="text-xs text-slate-500 hover:text-rose-400"
-                          title="Verwijder kalender"
+                          title={t('deleteCalendar')}
                         >
                           🗑️
                         </button>
@@ -1093,15 +1115,15 @@ export default function App() {
                             )
                           )
                         }
-                        placeholder="Plak hier je Google Agenda 'Geheim adres in iCal-indeling' (.ics)..."
+                        placeholder={t('icsPlaceholder')}
                         className="w-full bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
                       />
                       {cal.error && (
-                        <div className="text-xs text-rose-400">⚠️ Fout bij sync: {cal.error}</div>
+                        <div className="text-xs text-rose-400">{t('syncError', { e: cal.error })}</div>
                       )}
                       {cal.lastSync && !cal.error && (
                         <div className="text-xs text-emerald-400">
-                          ✓ Laatst gesynchroniseerd om {cal.lastSync}
+                          {t('lastSynced', { t: cal.lastSync })}
                         </div>
                       )}
                     </div>
@@ -1114,14 +1136,14 @@ export default function App() {
                   className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2.5"
                 >
                   <div className="text-xs font-semibold text-slate-300">
-                    ＋ Extra Kalender Toevoegen
+                    {t('addCalendarHeader')}
                   </div>
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={newCalName}
                       onChange={(e) => setNewCalName(e.target.value)}
-                      placeholder="Naam (bijv. Werk / Privé)"
+                      placeholder={t('calNamePlaceholder')}
                       className="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs"
                     />
                     <input
@@ -1143,7 +1165,7 @@ export default function App() {
                       type="submit"
                       className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium"
                     >
-                      Voeg toe
+                      {t('addBtn')}
                     </button>
                   </div>
                 </form>
@@ -1152,7 +1174,7 @@ export default function App() {
                   onClick={syncAllCalendars}
                   className="w-full py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold transition"
                 >
-                  🔄 Opslaan & .ICS-feeds synchroniseren
+                  {t('saveSync')}
                 </button>
               </div>
             )}
@@ -1163,7 +1185,7 @@ export default function App() {
                 {/* Google Agenda koppeling (nodig voor 'Naar morgen') */}
                 <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-slate-200">Google Agenda koppeling</span>
+                    <span className="font-semibold text-slate-200">{t('googleSection')}</span>
                     <span
                       className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
                         googleStatus.connected
@@ -1171,15 +1193,10 @@ export default function App() {
                           : 'bg-slate-800 text-slate-400'
                       }`}
                     >
-                      {googleStatus.connected ? 'Gekoppeld' : 'Niet gekoppeld'}
+                      {googleStatus.connected ? t('connected') : t('notConnected')}
                     </span>
                   </div>
-                  <p className="text-slate-400 leading-relaxed">
-                    Nodig om afspraken met <b>Naar morgen</b> in Google Agenda te verplaatsen.
-                    Eenmalig: maak in Google Cloud Console een OAuth-client van het type
-                    &quot;Desktop-app&quot; (met de Google Calendar API aan) en plak hier de
-                    gegevens.
-                  </p>
+                  <p className="text-slate-400 leading-relaxed">{t('googleHelp')}</p>
                   {!googleStatus.connected ? (
                     <>
                       <input
@@ -1201,7 +1218,7 @@ export default function App() {
                         disabled={googleBusy || !googleClientId.trim() || !googleClientSecret.trim()}
                         className="w-full px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-medium transition"
                       >
-                        {googleBusy ? 'Wachten op Google…' : '🔐 Koppelen met Google'}
+                        {googleBusy ? t('waitingGoogle') : t('connectGoogle')}
                       </button>
                     </>
                   ) : (
@@ -1210,14 +1227,40 @@ export default function App() {
                       onClick={handleGoogleDisconnect}
                       className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
                     >
-                      Ontkoppelen
+                      {t('disconnect')}
                     </button>
                   )}
                   {googleMessage && <p className="text-slate-300">{googleMessage}</p>}
                 </div>
 
                 <div className="flex items-center justify-between py-1.5 border-b border-slate-800">
-                  <span>Melding vóór aanvang ("Binnenkort")</span>
+                  <span>{t('optLanguage')}</span>
+                  <select
+                    value={langSetting}
+                    onChange={(e) =>
+                      setSettings({ ...settings, language: e.target.value as LangSetting })
+                    }
+                    className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1"
+                  >
+                    <option value="auto">{t('langAuto')}</option>
+                    <option value="nl">Nederlands</option>
+                    <option value="en">English</option>
+                  </select>
+                </div>
+
+                {isTauri && (
+                  <div className="flex items-center justify-between py-1.5 border-b border-slate-800">
+                    <span>{t('optHideOnBlur')}</span>
+                    <input
+                      type="checkbox"
+                      checked={hideOnBlur}
+                      onChange={(e) => setSettings({ ...settings, hideOnBlur: e.target.checked })}
+                    />
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between py-1.5 border-b border-slate-800">
+                  <span>{t('optSoon')}</span>
                   <select
                     value={settings.soonMinutes}
                     onChange={(e) =>
@@ -1225,17 +1268,17 @@ export default function App() {
                     }
                     className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1"
                   >
-                    <option value={5}>5 minuten</option>
-                    <option value={10}>10 minuten</option>
-                    <option value={15}>15 minuten</option>
-                    <option value={30}>30 minuten</option>
-                    <option value={60}>1 uur</option>
+                    <option value={5}>{t('minutes', { n: 5 })}</option>
+                    <option value={10}>{t('minutes', { n: 10 })}</option>
+                    <option value={15}>{t('minutes', { n: 15 })}</option>
+                    <option value={30}>{t('minutes', { n: 30 })}</option>
+                    <option value={60}>{t('hour1')}</option>
                   </select>
                 </div>
 
                 {isTauri && (
                   <div className="flex items-center justify-between py-1.5 border-b border-slate-800">
-                    <span>Automatisch starten met Windows</span>
+                    <span>{t('optAutostart')}</span>
                     <input
                       type="checkbox"
                       checked={autostartOn === true}
@@ -1246,7 +1289,7 @@ export default function App() {
                 )}
 
                 <div className="flex items-center justify-between py-1.5 border-b border-slate-800">
-                  <span>Ververs-interval voor .ICS feeds</span>
+                  <span>{t('optRefresh')}</span>
                   <select
                     value={settings.refreshMinutes}
                     onChange={(e) =>
@@ -1254,21 +1297,21 @@ export default function App() {
                     }
                     className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1"
                   >
-                    <option value={5}>Elke 5 min</option>
-                    <option value={10}>Elke 10 min</option>
-                    <option value={30}>Elke 30 min</option>
+                    <option value={5}>{t('everyMin', { n: 5 })}</option>
+                    <option value={10}>{t('everyMin', { n: 10 })}</option>
+                    <option value={30}>{t('everyMin', { n: 30 })}</option>
                   </select>
                 </div>
 
                 <div className="flex items-center justify-between py-1.5 border-b border-slate-800">
-                  <span>Geluid afspelen bij herinnering</span>
+                  <span>{t('optSound')}</span>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={playReminderSound}
                       className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs"
                     >
-                      🔊 Test Geluid
+                      {t('testSound')}
                     </button>
                     <input
                       type="checkbox"
@@ -1281,16 +1324,16 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center justify-between py-1.5 border-b border-slate-800">
-                  <span>Spraakherinnering (Nederlandse stem)</span>
+                  <span>{t('optSpeech')}</span>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() =>
-                        speakReminder('Sprint Review', 'begint over 15 minuten')
+                        speakReminder('Sprint Review', t('speechSoon', { n: 15 }), lang)
                       }
                       className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs"
                     >
-                      🗣️ Test Stem
+                      {t('testVoice')}
                     </button>
                     <input
                       type="checkbox"
@@ -1303,7 +1346,7 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center justify-between py-1.5 border-b border-slate-800">
-                  <span>Verlopen afspraken automatisch afvinken</span>
+                  <span>{t('optAutoDismiss')}</span>
                   <input
                     type="checkbox"
                     checked={settings.autoDismissPast}
@@ -1314,7 +1357,7 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center justify-between py-1.5 border-b border-slate-800">
-                  <span>Aantal dagen vooruit laden (Toekomst)</span>
+                  <span>{t('optLoadDays')}</span>
                   <input
                     type="number"
                     min={1}
@@ -1328,7 +1371,7 @@ export default function App() {
                 </div>
 
                 <div className="flex items-center justify-between py-1.5">
-                  <span>Aantal dagen terug kijken (Verleden, 0 = alleen vanaf vandaag)</span>
+                  <span>{t('optPastDays')}</span>
                   <input
                     type="number"
                     min={0}
@@ -1348,22 +1391,28 @@ export default function App() {
           {settingsTab === 'calendars' && (
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-lg space-y-2">
               <h4 className="text-xs font-bold uppercase tracking-wider text-blue-400">
-                Hoe vind je jouw Google Agenda .ICS-link?
+                {t('howToTitle')}
               </h4>
               <ol className="text-xs text-slate-300 space-y-1.5 list-decimal list-inside leading-relaxed">
                 <li>
-                  Open Google Agenda in je browser en klik op het tandwieltje ⚙️ →{' '}
-                  <strong>Instellingen</strong>.
+                  {t('how1a')}
+                  <strong>{t('how1b')}</strong>.
                 </li>
                 <li>
-                  Klik links onder <em>Instellingen voor mijn agenda's</em> op jouw agenda.
+                  {t('how2a')}
+                  <em>{t('how2b')}</em>
+                  {t('how2c')}
                 </li>
                 <li>
-                  Scroll naar beneden naar <strong>Agenda integreren</strong>.
+                  {t('how3a')}
+                  <strong>{t('how3b')}</strong>.
                 </li>
                 <li>
-                  Kopieer het <strong>Geheim adres in iCal-indeling</strong> (eindigt op{' '}
-                  <code className="text-blue-400">basic.ics</code>) en plak hem hierboven!
+                  {t('how4a')}
+                  <strong>{t('how4b')}</strong>
+                  {t('how4c')}
+                  <code className="text-blue-400">basic.ics</code>
+                  {t('how4d')}
                 </li>
               </ol>
             </div>

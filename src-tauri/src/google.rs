@@ -16,6 +16,8 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager};
 
+use crate::ui::tr;
+
 const AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 const SCOPE: &str = "https://www.googleapis.com/auth/calendar.events";
@@ -38,7 +40,7 @@ fn config_path(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app
         .path()
         .app_config_dir()
-        .map_err(|e| format!("Geen configuratiemap: {e}"))?;
+        .map_err(|e| format!("{} {e}", tr("Geen configuratiemap:", "No config folder:")))?;
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir.join("google.json"))
 }
@@ -54,7 +56,7 @@ fn load_config(app: &AppHandle) -> GoogleConfig {
 fn save_config(app: &AppHandle, cfg: &GoogleConfig) -> Result<(), String> {
     let path = config_path(app)?;
     let json = serde_json::to_string_pretty(cfg).map_err(|e| e.to_string())?;
-    std::fs::write(path, json).map_err(|e| format!("Opslaan mislukt: {e}"))
+    std::fs::write(path, json).map_err(|e| format!("{} {e}", tr("Opslaan mislukt:", "Saving failed:")))
 }
 
 /// Escapet een waarde voor een curl-configbestand (tussen dubbele aanhalingstekens).
@@ -111,7 +113,7 @@ fn curl_request(
     child
         .stdin
         .take()
-        .ok_or("Geen stdin voor curl")?
+        .ok_or(tr("Geen stdin voor curl", "No stdin for curl"))?
         .write_all(config.as_bytes())
         .map_err(|e| e.to_string())?;
     let output = child.wait_with_output().map_err(|e| e.to_string())?;
@@ -120,7 +122,8 @@ fn curl_request(
     let code: u16 = code.trim().parse().unwrap_or(0);
     if code == 0 {
         return Err(format!(
-            "Geen verbinding met Google: {}",
+            "{} {}",
+            tr("Geen verbinding met Google:", "No connection to Google:"),
             String::from_utf8_lossy(&output.stderr).trim()
         ));
     }
@@ -156,7 +159,11 @@ fn wait_for_auth_code(listener: TcpListener, expected_state: &str) -> Result<Str
 
     loop {
         if Instant::now() > deadline {
-            return Err("Koppelen afgebroken: geen antwoord van Google binnen 5 minuten".into());
+            return Err(tr(
+                "Koppelen afgebroken: geen antwoord van Google binnen 5 minuten",
+                "Connecting cancelled: no response from Google within 5 minutes",
+            )
+            .into());
         }
         let (mut stream, _) = match listener.accept() {
             Ok(s) => s,
@@ -188,9 +195,21 @@ fn wait_for_auth_code(listener: TcpListener, expected_state: &str) -> Result<Str
 
         let (ok, message) = match (get("code"), get("error")) {
             (Some(code), _) if get("state").as_deref() == Some(expected_state) => {
-                (Some(code), "GMeer is gekoppeld aan Google Agenda. Je kunt dit tabblad sluiten.")
+                (
+                    Some(code),
+                    tr(
+                        "GMeer is gekoppeld aan Google Agenda. Je kunt dit tabblad sluiten.",
+                        "GMeer is connected to Google Calendar. You can close this tab.",
+                    ),
+                )
             }
-            (_, Some(_)) => (None, "Koppelen geweigerd of afgebroken. Je kunt dit tabblad sluiten."),
+            (_, Some(_)) => (
+                None,
+                tr(
+                    "Koppelen geweigerd of afgebroken. Je kunt dit tabblad sluiten.",
+                    "Connecting was denied or cancelled. You can close this tab.",
+                ),
+            ),
             _ => {
                 // Bijv. een favicon-verzoek: negeren en blijven wachten
                 let _ = stream.write_all(b"HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\n\r\n");
@@ -212,7 +231,7 @@ fn wait_for_auth_code(listener: TcpListener, expected_state: &str) -> Result<Str
             )
             .as_bytes(),
         );
-        return ok.ok_or_else(|| "Koppelen geweigerd in Google".to_string());
+        return ok.ok_or_else(|| tr("Koppelen geweigerd in Google", "Connecting was denied in Google").to_string());
     }
 }
 
@@ -220,7 +239,10 @@ fn get_access_token(cfg: &GoogleConfig) -> Result<String, String> {
     let refresh = cfg
         .refresh_token
         .as_deref()
-        .ok_or("Nog niet gekoppeld met Google (zie Opties)")?;
+        .ok_or(tr(
+            "Nog niet gekoppeld met Google (zie Opties)",
+            "Not connected to Google yet (see Options)",
+        ))?;
     let body = form_encode(&[
         ("client_id", &cfg.client_id),
         ("client_secret", &cfg.client_secret),
@@ -235,15 +257,17 @@ fn get_access_token(cfg: &GoogleConfig) -> Result<String, String> {
     )?;
     if code != 200 {
         return Err(format!(
-            "Google-token vernieuwen mislukt ({code}): {}. Koppel opnieuw via Opties.",
-            google_error_message(&resp)
+            "{} ({code}): {}. {}",
+            tr("Google-token vernieuwen mislukt", "Refreshing the Google token failed"),
+            google_error_message(&resp),
+            tr("Koppel opnieuw via Opties.", "Reconnect via Options.")
         ));
     }
     let v: Value = serde_json::from_str(&resp).map_err(|e| e.to_string())?;
     v["access_token"]
         .as_str()
         .map(String::from)
-        .ok_or_else(|| "Geen access_token van Google ontvangen".into())
+        .ok_or_else(|| tr("Geen access_token van Google ontvangen", "No access_token received from Google").into())
 }
 
 #[tauri::command]
@@ -266,7 +290,11 @@ pub async fn google_connect(
     let client_id = client_id.trim().to_string();
     let client_secret = client_secret.trim().to_string();
     if client_id.is_empty() || client_secret.is_empty() {
-        return Err("Vul zowel Client ID als Client secret in".into());
+        return Err(tr(
+            "Vul zowel Client ID als Client secret in",
+            "Please enter both Client ID and Client secret",
+        )
+        .into());
     }
 
     tauri::async_runtime::spawn_blocking(move || {
@@ -310,14 +338,18 @@ pub async fn google_connect(
         )?;
         if status != 200 {
             return Err(format!(
-                "Token ophalen mislukt ({status}): {}",
+                "{} ({status}): {}",
+                tr("Token ophalen mislukt", "Getting the token failed"),
                 google_error_message(&resp)
             ));
         }
         let v: Value = serde_json::from_str(&resp).map_err(|e| e.to_string())?;
         let refresh = v["refresh_token"]
             .as_str()
-            .ok_or("Google gaf geen refresh-token terug; probeer opnieuw te koppelen")?;
+            .ok_or(tr(
+                "Google gaf geen refresh-token terug; probeer opnieuw te koppelen",
+                "Google returned no refresh token; please try connecting again",
+            ))?;
 
         save_config(
             &app,
@@ -389,12 +421,24 @@ pub async fn google_move_event(
         )?;
         match status {
             200 => Ok(()),
-            404 => Err("Afspraak niet gevonden in Google Agenda".into()),
+            404 => Err(tr(
+                "Afspraak niet gevonden in Google Agenda",
+                "Appointment not found in Google Calendar",
+            )
+            .into()),
             403 => Err(format!(
-                "Geen rechten om deze afspraak te wijzigen: {}",
+                "{} {}",
+                tr(
+                    "Geen rechten om deze afspraak te wijzigen:",
+                    "No permission to change this appointment:"
+                ),
                 google_error_message(&resp)
             )),
-            _ => Err(format!("Google gaf fout {status}: {}", google_error_message(&resp))),
+            _ => Err(format!(
+                "{} {status}: {}",
+                tr("Google gaf fout", "Google returned error"),
+                google_error_message(&resp)
+            )),
         }
     })
     .await
@@ -445,7 +489,8 @@ pub async fn google_create_event(
         )?;
         if status != 200 {
             return Err(format!(
-                "Aanmaken mislukt ({status}): {}",
+                "{} ({status}): {}",
+                tr("Aanmaken mislukt", "Creating failed"),
                 google_error_message(&resp)
             ));
         }
@@ -453,7 +498,7 @@ pub async fn google_create_event(
         v["id"]
             .as_str()
             .map(String::from)
-            .ok_or_else(|| "Google gaf geen afspraak-ID terug".into())
+            .ok_or_else(|| tr("Google gaf geen afspraak-ID terug", "Google returned no appointment ID").into())
     })
     .await
     .map_err(|e| e.to_string())?

@@ -1,4 +1,5 @@
 import { CalendarEvent, CalendarSource, AppSettings } from './icsParser';
+import type { Lang } from './i18n';
 
 export const DEFAULT_SETTINGS: AppSettings = {
   soonMinutes: 15,
@@ -11,34 +12,45 @@ export const DEFAULT_SETTINGS: AppSettings = {
   speechEnabled: false,
   autoDismissPast: false,
   startWithWindows: true,
+  language: 'auto',
+  hideOnBlur: true,
 };
 
-export const DEFAULT_CALENDARS: CalendarSource[] = [
-  {
-    id: 'cal-work',
-    name: 'Werk & Projecten',
-    icsUrl: '',
-    color: '#3b82f6', // blue-500
-    enabled: true,
-  },
-  {
-    id: 'cal-personal',
-    name: 'Privé & Gezin',
-    icsUrl: '',
-    color: '#10b981', // emerald-500
-    enabled: true,
-  },
-  {
-    id: 'cal-sport',
-    name: 'Verjaardagen & Sport',
-    icsUrl: '',
-    color: '#f59e0b', // amber-500
-    enabled: true,
-  },
-];
+// Namen van de demo-/standaardkalenders per taal (alleen bij de allereerste start gebruikt)
+const CAL_NAMES: Record<Lang, Record<string, string>> = {
+  nl: { 'cal-work': 'Werk & Projecten', 'cal-personal': 'Privé & Gezin', 'cal-sport': 'Verjaardagen & Sport' },
+  en: { 'cal-work': 'Work & Projects', 'cal-personal': 'Personal & Family', 'cal-sport': 'Birthdays & Sports' },
+};
 
-export function createDemoEvents(): CalendarEvent[] {
+export function defaultCalendars(lang: Lang): CalendarSource[] {
+  return [
+    { id: 'cal-work', name: CAL_NAMES[lang]['cal-work'], icsUrl: '', color: '#3b82f6', enabled: true },
+    { id: 'cal-personal', name: CAL_NAMES[lang]['cal-personal'], icsUrl: '', color: '#10b981', enabled: true },
+    { id: 'cal-sport', name: CAL_NAMES[lang]['cal-sport'], icsUrl: '', color: '#f59e0b', enabled: true },
+  ];
+}
+
+const DEMO_TEXT: Record<Lang, Record<string, string>> = {
+  nl: {
+    t1: 'Sprint Review & Live Demo GMeer', d1: 'Bespreken van de nieuwe Rust + Tauri v2 architectuur en live preview.', l1: 'Google Meet / Kamer 3.02',
+    t2: 'Belafspraak Accountant Q4', d2: 'Kwartaalcijfers doornemen.', l2: 'Telefoon (+31 6 12345678)',
+    t3: 'Pakketje ophalen & Boodschappen', l3: 'Albert Heijn XL',
+    t4: 'Padel Training Baan 4', l4: 'Plaza Padel',
+    t5: 'Verjaardag Sanne 🎉', l5: 'Amsterdam',
+  },
+  en: {
+    t1: 'Sprint Review & Live Demo GMeer', d1: 'Discuss the new Rust + Tauri v2 architecture and live preview.', l1: 'Google Meet / Room 3.02',
+    t2: 'Call with Accountant Q4', d2: 'Go through the quarterly figures.', l2: 'Phone (+44 20 7946 0000)',
+    t3: 'Pick up parcel & groceries', l3: 'Supermarket',
+    t4: 'Padel Training Court 4', l4: 'Plaza Padel',
+    t5: "Sanne's Birthday 🎉", l5: 'Amsterdam',
+  },
+};
+
+export function createDemoEvents(lang: Lang): CalendarEvent[] {
   const now = new Date();
+  const tx = DEMO_TEXT[lang];
+  const cal = CAL_NAMES[lang];
 
   const makeTime = (daysOffset: number, hoursOffset: number, minsOffset: number) => {
     const d = new Date(now.getTime() + (hoursOffset * 60 + minsOffset) * 60 * 1000);
@@ -53,11 +65,11 @@ export function createDemoEvents(): CalendarEvent[] {
     {
       id: 'demo-1',
       calendarId: 'cal-work',
-      calendarName: 'Werk & Projecten',
+      calendarName: cal['cal-work'],
       color: '#3b82f6',
-      title: 'Sprint Review & Live Demo GMeer',
-      description: 'Bespreken van de nieuwe Rust + Tauri v2 architectuur en live preview.',
-      location: 'Google Meet / Kamer 3.02',
+      title: tx.t1,
+      description: tx.d1,
+      location: tx.l1,
       start: makeTime(0, 0, -15), // 15 min geleden gestart
       end: makeTime(0, 0, 30),    // duurt nog 30 min -> Status: NOW
       allDay: false,
@@ -67,11 +79,11 @@ export function createDemoEvents(): CalendarEvent[] {
     {
       id: 'demo-2',
       calendarId: 'cal-work',
-      calendarName: 'Werk & Projecten',
+      calendarName: cal['cal-work'],
       color: '#3b82f6',
-      title: 'Belafspraak Accountant Q4',
-      description: 'Kwartaalcijfers doornemen.',
-      location: 'Telefoon (+31 6 12345678)',
+      title: tx.t2,
+      description: tx.d2,
+      location: tx.l2,
       start: makeTime(0, 0, 10),  // begint over 10 min -> Status: SOON
       end: makeTime(0, 0, 40),
       allDay: false,
@@ -81,10 +93,10 @@ export function createDemoEvents(): CalendarEvent[] {
     {
       id: 'demo-3',
       calendarId: 'cal-personal',
-      calendarName: 'Privé & Gezin',
+      calendarName: cal['cal-personal'],
       color: '#10b981',
-      title: 'Pakketje ophalen & Boodschappen',
-      location: 'Albert Heijn XL',
+      title: tx.t3,
+      location: tx.l3,
       start: makeTime(0, 3, 0),   // over 3 uur -> Status: FUTURE
       end: makeTime(0, 3, 45),
       allDay: false,
@@ -94,10 +106,10 @@ export function createDemoEvents(): CalendarEvent[] {
     {
       id: 'demo-4',
       calendarId: 'cal-sport',
-      calendarName: 'Verjaardagen & Sport',
+      calendarName: cal['cal-sport'],
       color: '#f59e0b',
-      title: 'Padel Training Baan 4',
-      location: 'Plaza Padel',
+      title: tx.t4,
+      location: tx.l4,
       start: makeTime(1, 2, 0),   // morgen
       end: makeTime(1, 3, 30),
       allDay: false,
@@ -107,10 +119,10 @@ export function createDemoEvents(): CalendarEvent[] {
     {
       id: 'demo-5',
       calendarId: 'cal-personal',
-      calendarName: 'Privé & Gezin',
+      calendarName: cal['cal-personal'],
       color: '#10b981',
-      title: 'Verjaardag Sanne 🎉',
-      location: 'Amsterdam',
+      title: tx.t5,
+      location: tx.l5,
       start: tomorrowAllDayStart.toISOString(),
       end: tomorrowAllDayEnd.toISOString(),
       allDay: true,
@@ -151,12 +163,12 @@ export function playReminderSound() {
 /**
  * Speaks the event reminder aloud using Web Speech API (inspired by Sound.Speak in GMinder)
  */
-export function speakReminder(title: string, relativeText: string) {
+export function speakReminder(title: string, relativeText: string, lang: Lang = 'nl') {
   try {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(`${title}, ${relativeText}`);
-      utterance.lang = 'nl-NL';
+      utterance.lang = lang === 'nl' ? 'nl-NL' : 'en-GB';
       utterance.rate = 1.05;
       window.speechSynthesis.speak(utterance);
     }

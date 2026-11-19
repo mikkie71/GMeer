@@ -32,12 +32,12 @@
     "publisher": "Mikkie",
     "copyright": "© 2026 Mikkie",
     "category": "Productivity",
-    "shortDescription": "Google Agenda herinneringen in het systeemvak",
-    "longDescription": "GMeer toont je Google Agenda-afspraken in het Windows-systeemvak, met herinneringen, snel toevoegen en 'Naar morgen' verplaatsen.",
+    "shortDescription": "Google Calendar reminders in the system tray",
+    "longDescription": "GMeer shows your Google Calendar appointments in the Windows system tray, with reminders, quick add and move to tomorrow.",
     "windows": {
       "nsis": {
         "installMode": "currentUser",
-        "languages": ["Dutch"],
+        "languages": ["English", "Dutch"],
         "displayLanguageSelector": false,
         "installerIcon": "icons/icon.ico",
         "startMenuFolder": "GMeer",
