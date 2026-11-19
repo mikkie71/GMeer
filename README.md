@@ -12,7 +12,7 @@ Because milowg stopped working on it in 2017 and it started to have some bugs, I
   <img src="docs/settings.png" alt="GMeer calendar settings" width="380">
 </p>
 
-<sub>Screenshots show demo data (Dutch interface; English is also available).</sub>
+<sub>Screenshots show demo data (English interface; Dutch is also available).</sub>
 
 ## Features
 
